@@ -1,46 +1,30 @@
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
 import os
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 
-# Configurações do banco de dados usando variáveis de ambiente
-DB_USER = os.environ.get('DB_USER')
-DB_PASSWORD = os.environ.get('DB_PASSWORD')
-DB_HOST = os.environ.get('DB_HOST')
-DB_NAME = os.environ.get('DB_NAME')
-DB_PORT = os.environ.get('DB_PORT', 5432)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
+# Definir a URL completa do banco de dados PostgreSQL
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:TXhcBjuVGMExFBSJHEgUONIAcwufdKln@junction.proxy.rlwy.net:59480/railway"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Inicializar o SQLAlchemy
 db = SQLAlchemy(app)
 
+# Definir o modelo da tabela 'sensores'
 class SensorData(db.Model):
+    __tablename__ = 'sensores'
     id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.String(50))
-    umidade = db.Column(db.Float)
+    data_hora = db.Column(db.DateTime, default=db.func.current_timestamp())
     vibracao = db.Column(db.Float)
-    inclinacao_x = db.Column(db.Float)
-    inclinacao_y = db.Column(db.Float)
-    inclinacao_z = db.Column(db.Float)
+    umidade = db.Column(db.Float)
+    deslocamento_x = db.Column(db.Float)
+    deslocamento_y = db.Column(db.Float)
+    deslocamento_z = db.Column(db.Float)
 
-db.create_all()
+# Criar a tabela 'sensores' se não existir
+with app.app_context():
+    db.create_all()
 
-@app.route('/sensores', methods=['POST'])
-def receber_dados():
-    dados = request.json
-    novo_dado = SensorData(
-        timestamp=dados['dataHora'],
-        umidade=dados['umidade'],
-        vibracao=dados['vibracao'],
-        inclinacao_x=dados['ax'],
-        inclinacao_y=dados['ay'],
-        inclinacao_z=dados['az']
-    )
-    db.session.add(novo_dado)
-    db.session.commit()
-    return jsonify({"message": "Dados recebidos com sucesso!"}), 200
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
