@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 import paho.mqtt.client as mqtt
 import json
 import ssl
+import certifi
 
 # Configurações MQTT
 MQTT_BROKER = "e66b9d6c631847079aa74758720c6fbe.s1.eu.hivemq.cloud"
@@ -73,7 +74,7 @@ def on_message(client, userdata, msg):
 # Configurar o cliente MQTT
 mqtt_client = mqtt.Client("PostgreSQL_Subscriber")
 mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-mqtt_client.tls_set(ca_certs="C:\\Users\\Weslley\\Desktop\\monitoramento-encostas\\DigiCertGlobalRootCA.pem", cert_reqs=ssl.CERT_NONE)
+mqtt_client.tls_set(certifi.where(), cert_reqs=ssl.CERT_NONE)
 mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
 
