@@ -7,11 +7,11 @@ import ssl
 import certifi
 
 # Configurações MQTT
-MQTT_BROKER = "e66b9d6c631847079aa74758720c6fbe.s1.eu.hivemq.cloud"
-MQTT_PORT = 8883
-MQTT_TOPIC = "sensores/dados"
-MQTT_USERNAME = "weslley.almeida"
-MQTT_PASSWORD = "Naruto12!"
+MQTT_BROKER = os.getenv('MQTT_BROKER', "e66b9d6c631847079aa74758720c6fbe.s1.eu.hivemq.cloud")
+MQTT_PORT = int(os.getenv('MQTT_PORT', 8883))
+MQTT_TOPIC = os.getenv('MQTT_TOPIC', "sensores/dados")
+MQTT_USERNAME = os.getenv('MQTT_USERNAME', "weslley.almeida")
+MQTT_PASSWORD = os.getenv('MQTT_PASSWORD', "Naruto12!")  # Isso deve ser substituído por variáveis de ambiente seguras.
 
 # Configuração do Flask
 app = Flask(__name__)
