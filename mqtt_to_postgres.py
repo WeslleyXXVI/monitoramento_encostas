@@ -1,71 +1,96 @@
 import os
+from flask import Flask, render_template
+from flask_sqlalchemy import SQLAlchemy
 import paho.mqtt.client as mqtt
-import psycopg2
 import json
+import ssl
 
-# Configurações do banco de dados PostgreSQL no Railway
-DATABASE_URL = "postgresql://postgres:TXhcBjuVGMExFBSJHEgUONIAcwufdKln@junction.proxy.rlwy.net:59480/railway"
+# Configurações MQTT
+MQTT_BROKER = "e66b9d6c631847079aa74758720c6fbe.s1.eu.hivemq.cloud"
+MQTT_PORT = 8883
+MQTT_TOPIC = "sensores/dados"
+MQTT_USERNAME = "weslley.almeida"
+MQTT_PASSWORD = "Naruto12!"
 
-# Conectar ao banco de dados PostgreSQL
-conn = psycopg2.connect(DATABASE_URL)
-cursor = conn.cursor()
+# Configuração do Flask
+app = Flask(__name__)
 
-# Definir a tabela no banco de dados (caso ainda não exista)
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS sensores (
-        id SERIAL PRIMARY KEY,
-        data_hora TIMESTAMP,
-        umidade FLOAT,
-        vibracao FLOAT,
-        deslocamento_x FLOAT,
-        deslocamento_y FLOAT,
-        deslocamento_z FLOAT
-    );
-""")
-conn.commit()
+# Configuração do banco de dados PostgreSQL (Railway)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:TXhcBjuVGMExFBSJHEgUONIAcwufdKln@junction.proxy.rlwy.net:59480/railway')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Callback para quando a conexão for estabelecida
+# Inicializar o SQLAlchemy
+db = SQLAlchemy(app)
+
+# Modelo de dados para a tabela 'sensores'
+class SensorData(db.Model):
+    __tablename__ = 'sensores'
+    id = db.Column(db.Integer, primary_key=True)
+    data_hora = db.Column(db.String(50))
+    umidade = db.Column(db.Float)
+    vibracao = db.Column(db.Float)
+    deslocamento_x = db.Column(db.Float)
+    deslocamento_y = db.Column(db.Float)
+    deslocamento_z = db.Column(db.Float)
+
+# Criar a tabela 'sensores' se não existir
+with app.app_context():
+    db.create_all()
+
+# Função callback quando a conexão MQTT é estabelecida
 def on_connect(client, userdata, flags, rc):
-    print(f"Conectado ao broker MQTT com código {rc}")
-    # Se inscrever no tópico 'sensores/dados'
-    client.subscribe("sensores/dados")
+    if rc == 0:
+        print("Conectado ao broker MQTT")
+        client.subscribe(MQTT_TOPIC)
+    else:
+        print(f"Falha na conexão com o broker MQTT. Código: {rc}")
 
-# Callback para quando uma mensagem é recebida
+# Função callback quando uma mensagem MQTT é recebida
 def on_message(client, userdata, msg):
-    print(f"Mensagem recebida no tópico {msg.topic}: {msg.payload.decode()}")
     try:
-        # Decodificar a mensagem JSON
-        data = json.loads(msg.payload.decode())
+        # Decodificar a mensagem recebida
+        payload = json.loads(msg.payload)
+        print(f"Mensagem recebida: {payload}")
 
-        # Preparar o comando SQL para inserir os dados no banco de dados
-        insert_query = """
-            INSERT INTO sensores (data_hora, umidade, vibracao, deslocamento_x, deslocamento_y, deslocamento_z)
-            VALUES (%s, %s, %s, %s, %s, %s);
-        """
-        values = (
-            data['data_hora'],
-            data['umidade'],
-            data['vibracao'],
-            data['deslocamento_x'],
-            data['deslocamento_y'],
-            data['deslocamento_z']
+        # Criar um novo registro de dados no banco de dados
+        sensor_data = SensorData(
+            data_hora=payload["data_hora"],
+            umidade=payload["umidade"],
+            vibracao=payload["vibracao"],
+            deslocamento_x=payload["deslocamento_x"],
+            deslocamento_y=payload["deslocamento_y"],
+            deslocamento_z=payload["deslocamento_z"]
         )
 
-        # Executar o comando SQL e inserir os dados no banco de dados
-        cursor.execute(insert_query, values)
-        conn.commit()
-        print("Dados inseridos no banco de dados com sucesso!")
+        # Salvar os dados no banco de dados
+        db.session.add(sensor_data)
+        db.session.commit()
+        print("Dados armazenados no banco de dados.")
 
     except Exception as e:
-        print(f"Erro ao processar mensagem: {e}")
+        print(f"Erro ao processar a mensagem: {e}")
 
 # Configurar o cliente MQTT
-client = mqtt.Client("PostgresInserter")
-client.on_connect = on_connect
-client.on_message = on_message
+mqtt_client = mqtt.Client("PostgreSQL_Subscriber")
+mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+mqtt_client.tls_set(ca_certs="C:\\Users\\Weslley\\Desktop\\monitoramento-encostas\\DigiCertGlobalRootCA.pem", cert_reqs=ssl.CERT_NONE)
+mqtt_client.on_connect = on_connect
+mqtt_client.on_message = on_message
 
-# Conectar ao broker MQTT
-client.connect("broker.mqtt-dashboard.com", 1883, 60)
+# Conectar ao broker MQTT e iniciar o loop
+mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+mqtt_client.loop_start()
 
-# Iniciar o loop do cliente MQTT para escutar o tópico
-client.loop_forever()
+# Rotas da aplicação Flask
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/sensores')
+def sensores():
+    # Recuperar os dados dos sensores do banco de dados
+    dados = SensorData.query.order_by(SensorData.id.desc()).limit(10).all()
+    return render_template('sensores.html', dados=dados)
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5000)
