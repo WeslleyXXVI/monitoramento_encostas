@@ -89,9 +89,7 @@ def index():
 
 @app.route('/sensores')
 def sensores():
-    # Recuperar os dados dos sensores do banco de dados
-    dados = SensorData.query.order_by(SensorData.id.desc()).limit(10).all()
-    return render_template('sensores.html', dados=dados)
+    return render_template('sensores.html')
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
