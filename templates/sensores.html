@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensores em Tempo Real</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Incluindo os scripts do Chart.js e do Paho MQTT -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Monitoramento de Sensores em Tempo Real</h1>
+    </header>
+    <main>
+        <div class="container">
+            <canvas id="sensorChart" width="400" height="200"></canvas>
+        </div>
+    </main>
+    <footer>
+        <p>&copy; 2024 Monitoramento de Encostas</p>
+    </footer>
+
+    <script>
+        // Configuração do cliente MQTT para conexão com o HiveMQ Cloud
+        const client = new Paho.MQTT.Client("e66b9d6c631847079aa74758720c6fbe.s1.eu.hivemq.cloud", 8884, "clientId_" + parseInt(Math.random() * 100, 10));
+
+        client.onConnectionLost = function (responseObject) {
+            console.log("Conexão perdida: " + responseObject.errorMessage);
+        };
+
+        client.onMessageArrived = function (message) {
+            console.log("Mensagem recebida: " + message.payloadString);
+            const data = JSON.parse(message.payloadString);
+            updateChart(data);
+        };
+
+        client.connect({
+            useSSL: true,
+            userName: "seu_username",
+            password: "sua_senha",
+            onSuccess: function () {
+                console.log("Conectado ao HiveMQ");
+                client.subscribe("sensores/dados");
+            },
+            onFailure: function (error) {
+                console.error("Erro ao conectar: ", error);
+            }
+        });
+
+        // Criação do gráfico usando Chart.js
+        const ctx = document.getElementById('sensorChart').getContext('2d');
+        const sensorChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],  // Horários ou timestamps
+                datasets: [{
+                    label: 'Vibração',
+                    data: [],
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1,
+                    fill: false
+                }]
+            },
+            options: {
+                scales: {
+                    x: { type: 'time', time: { unit: 'minute' } },
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // Função para atualizar o gráfico com os novos dados
+        function updateChart(data) {
+            const time = data.data_hora;  // Timestamp da mensagem
+            const vibration = data.vibracao;
+
+            // Adicionando novos dados no gráfico
+            sensorChart.data.labels.push(time);
+            sensorChart.data.datasets[0].data.push(vibration);
+
+            // Limitar para mostrar apenas as últimas 50 entradas
+            if (sensorChart.data.labels.length > 50) {
+                sensorChart.data.labels.shift();
+                sensorChart.data.datasets[0].data.shift();
+            }
+
+            // Atualizando o gráfico
+            sensorChart.update();
+        }
+    </script>
+</body>
+</html>
