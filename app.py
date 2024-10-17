@@ -231,6 +231,9 @@ def logout():
 @app.route('/update_data', methods=['GET'])
 def update_data():
     ultimos_dados = SensorData.query.order_by(SensorData.id.desc()).limit(30).all()
+    if not ultimos_dados:
+        return jsonify({"datas": [], "umidades": [], "vibracoes": [], "deslocamentoX": [], "deslocamentoY": [], "deslocamentoZ": []})
+    
     chart_data = {
         "datas": [d.data_hora for d in reversed(ultimos_dados)],
         "umidades": [d.umidade for d in reversed(ultimos_dados)],
@@ -240,6 +243,7 @@ def update_data():
         "deslocamentoZ": [d.deslocamento_z for d in reversed(ultimos_dados)],
     }
     return jsonify(chart_data)
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
