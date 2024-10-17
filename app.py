@@ -108,13 +108,50 @@ mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 mqtt_client.loop_start()
 
 # Rotas Flask
-@app.route('/')
+#ROTA QUE FUNCIONA
+"""@app.route('/')
 def index():
     if 'usuario' in session:
         ultimo_dado = SensorData.query.order_by(SensorData.id.desc()).first()
         return render_template('index.html', usuario=session['usuario'], ultimo_dado=ultimo_dado)
     else:
+        return redirect(url_for('login'))"""
+
+#ROTA DE TESTE
+@app.route('/')
+def index():
+    if 'usuario' in session:
+        # Buscar o último dado dos sensores
+        ultimo_dado = SensorData.query.order_by(SensorData.id.desc()).first()
+
+        # Buscar as últimas 30 leituras para os gráficos
+        ultimas_leituras = SensorData.query.order_by(SensorData.id.desc()).limit(30).all()[::-1]
+
+        # Preparar os dados para exibir nos gráficos
+        datas = [leitura.data_hora for leitura in ultimas_leituras]
+        umidades = [leitura.umidade for leitura in ultimas_leituras]
+        vibracoes = [leitura.vibracao for leitura in ultimas_leituras]
+        deslocamentoX = [leitura.deslocamento_x for leitura in ultimas_leituras]
+        deslocamentoY = [leitura.deslocamento_y for leitura in ultimas_leituras]
+        deslocamentoZ = [leitura.deslocamento_z for leitura in ultimas_leituras]
+
+        # Converter os dados para JSON para serem usados pelo Chart.js
+        chart_data = {
+            "datas": datas,
+            "umidades": umidades,
+            "vibracoes": vibracoes,
+            "deslocamentoX": deslocamentoX,
+            "deslocamentoY": deslocamentoY,
+            "deslocamentoZ": deslocamentoZ
+        }
+
+        return render_template('index.html', 
+                               usuario=session['usuario'], 
+                               ultimo_dado=ultimo_dado, 
+                               chart_data=json.dumps(chart_data))
+    else:
         return redirect(url_for('login'))
+
     
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -153,6 +190,20 @@ def cadastro():
 def logout():
     session.pop('usuario', None)
     return redirect(url_for('login'))
+
+# Para receber dados novos do banco
+@app.route('/update_data', methods=['GET'])
+def update_data():
+    ultimos_dados = SensorData.query.order_by(SensorData.id.desc()).limit(30).all()
+    chart_data = {
+        "datas": [d.data_hora for d in reversed(ultimos_dados)],
+        "umidades": [d.umidade for d in reversed(ultimos_dados)],
+        "vibracoes": [d.vibracao for d in reversed(ultimos_dados)],
+        "deslocamentoX": [d.deslocamento_x for d in reversed(ultimos_dados)],
+        "deslocamentoY": [d.deslocamento_y for d in reversed(ultimos_dados)],
+        "deslocamentoZ": [d.deslocamento_z for d in reversed(ultimos_dados)],
+    }
+    return jsonify(chart_data)
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
