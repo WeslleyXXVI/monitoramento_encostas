@@ -250,6 +250,7 @@
       .then(data => {
         // Atualiza o último dado na interface
         document.querySelector('.card-title').innerText = data.ultimo_dado.data_hora;
+        document.querySelector('.card-text.display-6').innerText = data.ultimo_dado.umidade + '%';
 
         // Atualiza os gráficos
         humidityChart.data.labels = data.graficos.datas;
