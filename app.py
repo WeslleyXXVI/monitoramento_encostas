@@ -128,7 +128,7 @@ def index():
 
 #ROTA DE TESTE
 # **Nova Rota: Fornece dados para gráficos e última leitura**
-@app.route('/dados-sensores')
+"""@app.route('/dados-sensores')
 def dados_sensores():
     if 'usuario' in session:
         # Buscar o último dado dos sensores
@@ -159,7 +159,35 @@ def dados_sensores():
 
         return jsonify(dados)
     else:
-        return jsonify({"error": "Usuário não autenticado"}), 401
+        return jsonify({"error": "Usuário não autenticado"}), 401"""
+
+@app.route('/dados-sensores')
+def dados_sensores():
+    # Recuperar as últimas 30 leituras do banco de dados
+    dados = SensorData.query.order_by(SensorData.id.desc()).limit(30).all()
+    dados.reverse()  # Reverter para exibir em ordem cronológica
+
+    # Preparar dados para o gráfico
+    chart_data = {
+        "datas": [d.data_hora for d in dados],
+        "umidades": [d.umidade for d in dados],
+        "vibracoes": [d.vibracao for d in dados],
+        "deslocamentoX": [d.deslocamento_x for d in dados],
+        "deslocamentoY": [d.deslocamento_y for d in dados],
+        "deslocamentoZ": [d.deslocamento_z for d in dados],
+    }
+
+    # Preparar último dado para exibição no card
+    ultimo_dado = {
+        "data_hora": dados[-1].data_hora,
+        "umidade": dados[-1].umidade,
+        "vibracao": dados[-1].vibracao,
+        "deslocamento_x": dados[-1].deslocamento_x,
+        "deslocamento_y": dados[-1].deslocamento_y,
+        "deslocamento_z": dados[-1].deslocamento_z,
+    }
+
+    return jsonify({"graficos": chart_data, "ultimo_dado": ultimo_dado})
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
