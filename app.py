@@ -1,8 +1,9 @@
 import os
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import paho.mqtt.client as mqtt
 import json
+import hashlib
 import ssl
 import certifi
 
@@ -15,6 +16,9 @@ MQTT_PASSWORD = os.getenv('MQTT_PASSWORD', "Naruto12!")  # Isso deve ser substit
 
 # Configuração do Flask
 app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'mysecretkey')
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
 
 # Configuração do banco de dados PostgreSQL (Railway)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:TXhcBjuVGMExFBSJHEgUONIAcwufdKln@junction.proxy.rlwy.net:59480/railway')
@@ -34,9 +38,30 @@ class SensorData(db.Model):
     deslocamento_y = db.Column(db.Float)
     deslocamento_z = db.Column(db.Float)
 
+class Usuario(db.Model):
+    __tablename__ = 'usuarios'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(50), unique=True, nullable=False)
+    senha = db.Column(db.String(100), nullable=False)
+
 # Criar a tabela 'sensores' se não existir
 with app.app_context():
     db.create_all()
+
+# Função de Hash de Senhas
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+# Função para Verificar se o Usuário Existe
+def usuario_existe(email):
+    return Usuario.query.filter_by(email=email).first()
+
+# Função de Criação de Usuário
+def criar_usuario(nome, email, password):
+    usuario = Usuario(nome=nome, email=email, senha=hash_password(password))
+    db.session.add(usuario)
+    db.session.commit()
 
 # Função callback quando a conexão MQTT é estabelecida
 def on_connect(client, userdata, flags, rc):
@@ -82,14 +107,52 @@ mqtt_client.on_message = on_message
 mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
 mqtt_client.loop_start()
 
-# Rotas da aplicação Flask
+# Rotas Flask
 @app.route('/')
 def index():
-    return render_template('index.html')
+    if 'usuario' in session:
+        ultimo_dado = SensorData.query.order_by(SensorData.id.desc()).first()
+        return render_template('index.html', usuario=session['usuario'], ultimo_dado=ultimo_dado)
+    else:
+        return redirect(url_for('login'))
+    
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
 
-@app.route('/sensores')
-def sensores():
-    return render_template('sensores.html')
+        usuario = usuario_existe(email)
+        if usuario and usuario.senha == hash_password(password):
+            session['usuario'] = email
+            return redirect(url_for('index'))
+        else:
+            return render_template('login.html', error="Usuário ou senha incorretos")
+    return render_template('login.html')
+
+@app.route('/cadastro', methods=['GET', 'POST'])
+def cadastro():
+    if request.method == 'POST':
+        nome = request.form.get('nome')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+
+        if password != confirm_password:
+            return render_template('cadastro.html', error="As senhas não coincidem")
+
+        if usuario_existe(email):
+            return render_template('cadastro.html', error="Usuário já cadastrado")
+
+        criar_usuario(nome, email, password)
+        return redirect(url_for('login'))
+
+    return render_template('cadastro.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('usuario', None)
+    return redirect(url_for('login'))
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
