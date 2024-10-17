@@ -117,9 +117,19 @@ def index():
     else:
         return redirect(url_for('login'))"""
 
-#ROTA DE TESTE
+# Rota para a página principal
 @app.route('/')
 def index():
+    if 'usuario' in session:
+        ultimo_dado = SensorData.query.order_by(SensorData.id.desc()).first()
+        return render_template('index.html', usuario=session['usuario'], ultimo_dado=ultimo_dado)
+    else:
+        return redirect(url_for('login'))
+
+#ROTA DE TESTE
+# **Nova Rota: Fornece dados para gráficos e última leitura**
+@app.route('/dados-sensores')
+def dados_sensores():
     if 'usuario' in session:
         # Buscar o último dado dos sensores
         ultimo_dado = SensorData.query.order_by(SensorData.id.desc()).first()
@@ -127,32 +137,30 @@ def index():
         # Buscar as últimas 30 leituras para os gráficos
         ultimas_leituras = SensorData.query.order_by(SensorData.id.desc()).limit(30).all()[::-1]
 
-        # Preparar os dados para exibir nos gráficos
-        datas = [leitura.data_hora for leitura in ultimas_leituras]
-        umidades = [leitura.umidade for leitura in ultimas_leituras]
-        vibracoes = [leitura.vibracao for leitura in ultimas_leituras]
-        deslocamentoX = [leitura.deslocamento_x for leitura in ultimas_leituras]
-        deslocamentoY = [leitura.deslocamento_y for leitura in ultimas_leituras]
-        deslocamentoZ = [leitura.deslocamento_z for leitura in ultimas_leituras]
-
-        # Converter os dados para JSON para serem usados pelo Chart.js
-        chart_data = {
-            "datas": datas,
-            "umidades": umidades,
-            "vibracoes": vibracoes,
-            "deslocamentoX": deslocamentoX,
-            "deslocamentoY": deslocamentoY,
-            "deslocamentoZ": deslocamentoZ
+        # Preparar os dados para JSON
+        dados = {
+            "ultimo_dado": {
+                "data_hora": ultimo_dado.data_hora,
+                "umidade": ultimo_dado.umidade,
+                "vibracao": ultimo_dado.vibracao,
+                "deslocamento_x": ultimo_dado.deslocamento_x,
+                "deslocamento_y": ultimo_dado.deslocamento_y,
+                "deslocamento_z": ultimo_dado.deslocamento_z
+            },
+            "graficos": {
+                "datas": [leitura.data_hora for leitura in ultimas_leituras],
+                "umidades": [leitura.umidade for leitura in ultimas_leituras],
+                "vibracoes": [leitura.vibracao for leitura in ultimas_leituras],
+                "deslocamentoX": [leitura.deslocamento_x for leitura in ultimas_leituras],
+                "deslocamentoY": [leitura.deslocamento_y for leitura in ultimas_leituras],
+                "deslocamentoZ": [leitura.deslocamento_z for leitura in ultimas_leituras]
+            }
         }
 
-        return render_template('index.html', 
-                               usuario=session['usuario'], 
-                               ultimo_dado=ultimo_dado, 
-                               chart_data=json.dumps(chart_data))
+        return jsonify(dados)
     else:
-        return redirect(url_for('login'))
+        return jsonify({"error": "Usuário não autenticado"}), 401
 
-    
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
