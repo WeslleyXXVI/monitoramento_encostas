@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!--<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -22,7 +22,7 @@
         <section class="hero">
             <h1>MONITORAMENTO DE ENCOSTAS COM DISPOSITIVO EMBARCADO (IoT)</h1>
             <div class="hero-background">
-                <!-- Imagem de fundo de uma encosta -->
+                Imagem de fundo de uma encosta
             </div>
         </section>
 
@@ -33,7 +33,7 @@
 
         <section class="project-info">
             <h2>Sobre o Projeto</h2>
-            <p>A eficácia do monitoramento de encostas... <!-- Colocar o conteúdo do projeto aqui -->.</p>
+            <p>A eficácia do monitoramento de encostas...  Colocar o conteúdo do projeto aqui.</p>
         </section>
     </main>
 
@@ -41,4 +41,320 @@
         <p>&copy; 2024 Monitoramento de Encostas</p>
     </footer>
 </body>
-</html>
+</html>-->
+
+<!--INDEX QUE O RONALDO CRIOU-->
+<!-- templates/index.html -->
+
+{% extends "layout.html" %}
+
+{% block content %}
+<h1 class="text-center text-primary mb-4">SysMonRisk</h1>
+<div class="row">
+  <!-- Card Data e Hora -->
+  <div class="col-md-12 mb-4">
+    <div class="card text-center bg-dark text-light">
+      <div class="card-header">
+        Data e Hora
+      </div>
+      <div class="card-body">
+        <h5 class="card-title">{{ ultimo_dado[1] }}</h5>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Umidade -->
+  <div class="col-md-4 mb-4">
+    <div class="card text-center bg-dark text-light">
+      <div class="card-header">
+        Umidade
+      </div>
+      <div class="card-body">
+        <p class="card-text display-6">{{ ultimo_dado[2] }}%</p>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#humidityModal">Gráficos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Vibração -->
+  <div class="col-md-4 mb-4">
+    <div class="card text-center bg-dark text-light">
+      <div class="card-header">
+        Vibração
+      </div>
+      <div class="card-body">
+        <p class="card-text display-6">{{ ultimo_dado[3] }} Hz</p>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#vibrationModal">Gráficos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Deslocamento -->
+  <div class="col-md-4 mb-4">
+    <div class="card text-center bg-dark text-light">
+      <div class="card-header">
+        Deslocamento
+      </div>
+      <div class="card-body">
+        <p class="card-text">X: {{ ultimo_dado[4] }} mm</p>
+        <p class="card-text">Y: {{ ultimo_dado[5] }} mm</p>
+        <p class="card-text">Z: {{ ultimo_dado[6] }} mm</p>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#displacementModal">Gráficos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modais para Gráficos -->
+<!-- Modal Umidade -->
+<div class="modal fade" id="humidityModal" tabindex="-1" aria-labelledby="humidityModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title" id="humidityModalLabel">Gráfico de Umidade</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <canvas id="humidityChart" width="400" height="200"></canvas>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Vibração -->
+<div class="modal fade" id="vibrationModal" tabindex="-1" aria-labelledby="vibrationModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title" id="vibrationModalLabel">Gráfico de Vibração</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <canvas id="vibrationChart" width="400" height="200"></canvas>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Deslocamento -->
+<div class="modal fade" id="displacementModal" tabindex="-1" aria-labelledby="displacementModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title" id="displacementModalLabel">Gráficos de Deslocamento</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <canvas id="displacementXChart" width="400" height="200"></canvas>
+        <canvas id="displacementYChart" width="400" height="200" class="mt-4"></canvas>
+        <canvas id="displacementZChart" width="400" height="200" class="mt-4"></canvas>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts para Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Dados dos gráficos passados pelo Flask
+  const chartData = JSON.parse('{{ chart_data | safe }}');
+
+  // Gráfico de Umidade
+  const ctxHumidity = document.getElementById('humidityChart').getContext('2d');
+  const humidityChart = new Chart(ctxHumidity, {
+      type: 'line',
+      data: {
+          labels: chartData.datas,
+          datasets: [{
+              label: 'Umidade (%)',
+              data: chartData.umidades,
+              backgroundColor: 'rgba(54, 162, 235, 0.2)',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              borderWidth: 1,
+              fill: true,
+          }]
+      },
+      options: {
+          scales: {
+              x: {
+                  type: 'time',
+                  time: {
+                      unit: 'minute'
+                  },
+                  title: {
+                      display: true,
+                      text: 'Data e Hora'
+                  }
+              },
+              y: {
+                  beginAtZero: true,
+                  title: {
+                      display: true,
+                      text: 'Umidade (%)'
+                  }
+              }
+          }
+      }
+  });
+
+  // Gráfico de Vibração
+  const ctxVibration = document.getElementById('vibrationChart').getContext('2d');
+  const vibrationChart = new Chart(ctxVibration, {
+      type: 'line',
+      data: {
+          labels: chartData.datas,
+          datasets: [{
+              label: 'Vibração (Hz)',
+              data: chartData.vibracoes,
+              backgroundColor: 'rgba(255, 99, 132, 0.2)',
+              borderColor: 'rgba(255, 99, 132, 1)',
+              borderWidth: 1,
+              fill: true,
+          }]
+      },
+      options: {
+          scales: {
+              x: {
+                  type: 'time',
+                  time: {
+                      unit: 'minute'
+                  },
+                  title: {
+                      display: true,
+                      text: 'Data e Hora'
+                  }
+              },
+              y: {
+                  beginAtZero: true,
+                  title: {
+                      display: true,
+                      text: 'Vibração (Hz)'
+                  }
+              }
+          }
+      }
+  });
+
+  // Gráficos de Deslocamento X, Y e Z
+  const ctxDisplacementX = document.getElementById('displacementXChart').getContext('2d');
+  const displacementXChart = new Chart(ctxDisplacementX, {
+      type: 'line',
+      data: {
+          labels: chartData.datas,
+          datasets: [{
+              label: 'Deslocamento X (mm)',
+              data: chartData.deslocamentoX,
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              borderColor: 'rgba(75, 192, 192, 1)',
+              borderWidth: 1,
+              fill: true,
+          }]
+      },
+      options: {
+          scales: {
+              x: {
+                  type: 'time',
+                  time: {
+                      unit: 'minute'
+                  },
+                  title: {
+                      display: true,
+                      text: 'Data e Hora'
+                  }
+              },
+              y: {
+                  beginAtZero: true,
+                  title: {
+                      display: true,
+                      text: 'Deslocamento X (mm)'
+                  }
+              }
+          }
+      }
+  });
+
+  const ctxDisplacementY = document.getElementById('displacementYChart').getContext('2d');
+  const displacementYChart = new Chart(ctxDisplacementY, {
+      type: 'line',
+      data: {
+          labels: chartData.datas,
+          datasets: [{
+              label: 'Deslocamento Y (mm)',
+              data: chartData.deslocamentoY,
+              backgroundColor: 'rgba(153, 102, 255, 0.2)',
+              borderColor: 'rgba(153, 102, 255, 1)',
+              borderWidth: 1,
+              fill: true,
+          }]
+      },
+      options: {
+          scales: {
+              x: {
+                  type: 'time',
+                  time: {
+                      unit: 'minute'
+                  },
+                  title: {
+                      display: true,
+                      text: 'Data e Hora'
+                  }
+              },
+              y: {
+                  beginAtZero: true,
+                  title: {
+                      display: true,
+                      text: 'Deslocamento Y (mm)'
+                  }
+              }
+          }
+      }
+  });
+
+  const ctxDisplacementZ = document.getElementById('displacementZChart').getContext('2d');
+  const displacementZChart = new Chart(ctxDisplacementZ, {
+      type: 'line',
+      data: {
+          labels: chartData.datas,
+          datasets: [{
+              label: 'Deslocamento Z (mm)',
+              data: chartData.deslocamentoZ,
+              backgroundColor: 'rgba(255, 206, 86, 0.2)',
+              borderColor: 'rgba(255, 206, 86, 1)',
+              borderWidth: 1,
+              fill: true,
+          }]
+      },
+      options: {
+          scales: {
+              x: {
+                  type: 'time',
+                  time: {
+                      unit: 'minute'
+                  },
+                  title: {
+                      display: true,
+                      text: 'Data e Hora'
+                  }
+              },
+              y: {
+                  beginAtZero: true,
+                  title: {
+                      display: true,
+                      text: 'Deslocamento Z (mm)'
+                  }
+              }
+          }
+      }
+  });
+</script>
+{% endblock %}
+
