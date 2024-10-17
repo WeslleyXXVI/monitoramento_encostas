@@ -244,37 +244,42 @@
   }
 
   // Função para atualizar os dados e gráficos
-  function atualizarDados() {
-    fetch('/dados-sensores')
-      .then(response => response.json())
-      .then(data => {
-        // Atualiza o último dado na interface
-        document.querySelector('.card-title').innerText = data.ultimo_dado.data_hora;
-        document.querySelector('.card-text.display-6').innerText = data.ultimo_dado.umidade + '%';
+  function updateData() {
+  fetch('/dados-sensores')
+    .then(response => response.json())
+    .then(data => {
+      // Atualizar os gráficos
+      humidityChart.data.labels = data.graficos.datas;
+      humidityChart.data.datasets[0].data = data.graficos.umidades;
+      humidityChart.update();
 
-        // Atualiza os gráficos
-        humidityChart.data.labels = data.graficos.datas;
-        humidityChart.data.datasets[0].data = data.graficos.umidades;
-        humidityChart.update();
+      vibrationChart.data.labels = data.graficos.datas;
+      vibrationChart.data.datasets[0].data = data.graficos.vibracoes;
+      vibrationChart.update();
 
-        vibrationChart.data.labels = data.graficos.datas;
-        vibrationChart.data.datasets[0].data = data.graficos.vibracoes;
-        vibrationChart.update();
+      displacementXChart.data.labels = data.graficos.datas;
+      displacementXChart.data.datasets[0].data = data.graficos.deslocamentoX;
+      displacementXChart.update();
 
-        displacementXChart.data.labels = data.graficos.datas;
-        displacementXChart.data.datasets[0].data = data.graficos.deslocamentoX;
-        displacementXChart.update();
+      displacementYChart.data.labels = data.graficos.datas;
+      displacementYChart.data.datasets[0].data = data.graficos.deslocamentoY;
+      displacementYChart.update();
 
-        displacementYChart.data.labels = data.graficos.datas;
-        displacementYChart.data.datasets[0].data = data.graficos.deslocamentoY;
-        displacementYChart.update();
+      displacementZChart.data.labels = data.graficos.datas;
+      displacementZChart.data.datasets[0].data = data.graficos.deslocamentoZ;
+      displacementZChart.update();
 
-        displacementZChart.data.labels = data.graficos.datas;
-        displacementZChart.data.datasets[0].data = data.graficos.deslocamentoZ;
-        displacementZChart.update();
-      })
-      .catch(error => console.error('Erro ao buscar dados:', error));
-  }
+      // Atualizar os valores mais recentes na interface
+      document.getElementById('ultimo_data_hora').textContent = data.ultimo_dado.data_hora;
+      document.getElementById('ultimo_umidade').textContent = `${data.ultimo_dado.umidade}%`;
+      document.getElementById('ultimo_vibracao').textContent = `${data.ultimo_dado.vibracao} Hz`;
+      document.getElementById('ultimo_deslocamento_x').textContent = `${data.ultimo_dado.deslocamento_x} mm`;
+      document.getElementById('ultimo_deslocamento_y').textContent = `${data.ultimo_dado.deslocamento_y} mm`;
+      document.getElementById('ultimo_deslocamento_z').textContent = `${data.ultimo_dado.deslocamento_z} mm`;
+    })
+    .catch(error => console.error('Erro ao atualizar os dados:', error));
+}
+
 
   // Inicializa os gráficos com dados iniciais
   document.addEventListener('DOMContentLoaded', () => {
