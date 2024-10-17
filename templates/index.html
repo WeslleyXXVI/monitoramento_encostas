@@ -238,7 +238,7 @@
       document.getElementById('ultimo_deslocamento_z').textContent = `${data.deslocamentoZ[data.deslocamentoZ.length - 1]} mm`;
     })
     .catch(error => console.error('Erro ao atualizar os dados:', error));
-}
+ }
 
 
   // Inicializa os gráficos com dados iniciais
@@ -246,8 +246,13 @@
     const initialChartData = JSON.parse('{{ chart_data | safe }}');
     initCharts(initialChartData);
 
-    // Atualiza os dados a cada 10 segundos
-    setInterval(atualizarDados, 10000);
+    // Verificar se o endpoint está sendo chamado corretamente
+    setInterval(() => {
+      fetch('/update_data')
+        .then(response => response.json())
+        .then(data => console.log('Dados atualizados:', data))
+        .catch(error => console.error('Erro ao atualizar:', error));
+    }, 10000);
   });
 </script>
 {% endblock %}
