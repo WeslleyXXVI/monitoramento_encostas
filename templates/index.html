@@ -54,11 +54,9 @@
   <!-- Card Data e Hora -->
   <div class="col-md-12 mb-4">
     <div class="card text-center bg-dark text-light">
-      <div class="card-header">
-        Data e Hora
-      </div>
+      <div class="card-header">Data e Hora</div>
       <div class="card-body">
-        <h5 class="card-title">{{ ultimo_dado[1] }}</h5>
+        <h5 class="card-title" id="ultimo_data_hora">{{ ultimo_dado.data_hora }}</h5>
       </div>
     </div>
   </div>
@@ -66,11 +64,9 @@
   <!-- Card Umidade -->
   <div class="col-md-4 mb-4">
     <div class="card text-center bg-dark text-light">
-      <div class="card-header">
-        Umidade
-      </div>
+      <div class="card-header">Umidade</div>
       <div class="card-body">
-        <p class="card-text display-6">{{ ultimo_dado[2] }}%</p>
+        <p class="card-text display-6" id="ultimo_umidade">{{ ultimo_dado.umidade }}%</p>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#humidityModal">Gráficos</button>
       </div>
     </div>
@@ -79,26 +75,23 @@
   <!-- Card Vibração -->
   <div class="col-md-4 mb-4">
     <div class="card text-center bg-dark text-light">
-      <div class="card-header">
-        Vibração
-      </div>
+      <div class="card-header">Vibração</div>
       <div class="card-body">
-        <p class="card-text display-6">{{ ultimo_dado[3] }} Hz</p>
+        <p class="card-text display-6" id="ultimo_vibracao">{{ ultimo_dado.vibracao }} Hz</p>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#vibrationModal">Gráficos</button>
       </div>
     </div>
   </div>
 
   <!-- Card Deslocamento -->
+  <!-- Card Deslocamento -->
   <div class="col-md-4 mb-4">
     <div class="card text-center bg-dark text-light">
-      <div class="card-header">
-        Deslocamento
-      </div>
+      <div class="card-header">Deslocamento</div>
       <div class="card-body">
-        <p class="card-text">X: {{ ultimo_dado[4] }} mm</p>
-        <p class="card-text">Y: {{ ultimo_dado[5] }} mm</p>
-        <p class="card-text">Z: {{ ultimo_dado[6] }} mm</p>
+        <p class="card-text">X: <span id="ultimo_deslocamento_x">{{ ultimo_dado.deslocamento_x }}</span> mm</p>
+        <p class="card-text">Y: <span id="ultimo_deslocamento_y">{{ ultimo_dado.deslocamento_y }}</span> mm</p>
+        <p class="card-text">Z: <span id="ultimo_deslocamento_z">{{ ultimo_dado.deslocamento_z }}</span> mm</p>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#displacementModal">Gráficos</button>
       </div>
     </div>
@@ -169,6 +162,7 @@
   const chartData = JSON.parse('{{ chart_data | safe }}');
 
   // Gráfico de Umidade
+  /*
   const ctxHumidity = document.getElementById('humidityChart').getContext('2d');
   const humidityChart = new Chart(ctxHumidity, {
       type: 'line',
@@ -354,7 +348,95 @@
               }
           }
       }
-  });
+  });*/
+  // Função para criar gráficos
+  function createChart(ctx, label, data, unit) {
+    return new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: chartData.datas,
+        datasets: [{
+          label: `${label} (${unit})`,
+          data: data,
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1,
+          fill: true
+        }]
+      },
+      options: {
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'minute' },
+            title: { display: true, text: 'Data e Hora' }
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: `${label} (${unit})` }
+          }
+        }
+      }
+    });
+  }
+
+// Inicialização dos gráficos
+  const ctxHumidity = document.getElementById('humidityChart').getContext('2d');
+  const humidityChart = createChart(ctxHumidity, 'Umidade', chartData.umidades, '%');
+
+  const ctxVibration = document.getElementById('vibrationChart').getContext('2d');
+  const vibrationChart = createChart(ctxVibration, 'Vibração', chartData.vibracoes, 'Hz');
+
+  const ctxDisplacementX = document.getElementById('displacementXChart').getContext('2d');
+  const displacementXChart = createChart(ctxDisplacementX, 'Deslocamento X', chartData.deslocamentoX, 'mm');
+
+  const ctxDisplacementY = document.getElementById('displacementYChart').getContext('2d');
+  const displacementYChart = createChart(ctxDisplacementY, 'Deslocamento Y', chartData.deslocamentoY, 'mm');
+
+  const ctxDisplacementZ = document.getElementById('displacementZChart').getContext('2d');
+  const displacementZChart = createChart(ctxDisplacementZ, 'Deslocamento Z', chartData.deslocamentoZ, 'mm');
+
+
+  // Função para atualizar os dados dinamicamente
+  function updateData() {
+    fetch('/update_data')
+      .then(response => response.json())
+      .then(data => {
+        // Atualizar gráficos
+        humidityChart.data.labels = data.datas;
+        humidityChart.data.datasets[0].data = data.umidades;
+        humidityChart.update();
+
+        vibrationChart.data.labels = data.datas;
+        vibrationChart.data.datasets[0].data = data.vibracoes;
+        vibrationChart.update();
+
+        displacementXChart.data.labels = data.datas;
+        displacementXChart.data.datasets[0].data = data.deslocamentoX;
+        displacementXChart.update();
+
+        displacementYChart.data.labels = data.datas;
+        displacementYChart.data.datasets[0].data = data.deslocamentoY;
+        displacementYChart.update();
+
+        displacementZChart.data.labels = data.datas;
+        displacementZChart.data.datasets[0].data = data.deslocamentoZ;
+        displacementZChart.update();
+
+        // Atualizar os valores mais recentes na interface
+        document.getElementById('ultimo_data_hora').textContent = data.datas[data.datas.length - 1];
+        document.getElementById('ultimo_umidade').textContent = `${data.umidades[data.umidades.length - 1]}%`;
+        document.getElementById('ultimo_vibracao').textContent = `${data.vibracoes[data.vibracoes.length - 1]} Hz`;
+        document.getElementById('ultimo_deslocamento_x').textContent = `${data.deslocamentoX[data.deslocamentoX.length - 1]} mm`;
+        document.getElementById('ultimo_deslocamento_y').textContent = `${data.deslocamentoY[data.deslocamentoY.length - 1]} mm`;
+        document.getElementById('ultimo_deslocamento_z').textContent = `${data.deslocamentoZ[data.deslocamentoZ.length - 1]} mm`;
+      })
+      .catch(error => console.error('Erro ao atualizar os dados:', error));
+  }
+
+  // Atualizar os dados a cada 10 segundos
+  setInterval(updateData, 10000);
+  
 </script>
 {% endblock %}
 
