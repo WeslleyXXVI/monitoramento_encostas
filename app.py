@@ -244,6 +244,20 @@ def update_data():
     }
     return jsonify(chart_data)
 
+#TESTE COM ROTA QUE O RONALDO ADICIONOU
+@app.route('/dados_graficos')
+def dados_graficos():
+    # Endpoint para fornecer dados via AJAX para atualização dos gráficos
+    chart_data = {
+        'datas': ['2024-10-18 14:00', '2024-10-18 14:05', '2024-10-18 14:10'],
+        'umidades': [50, 55, 60],
+        'vibracoes': [115, 120, 115],
+        'deslocamentoX': [4, 5, 6],
+        'deslocamentoY': [9, 10, 11],
+        'deslocamentoZ': [14, 15, 16]
+    }
+    return jsonify(chart_data)
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
