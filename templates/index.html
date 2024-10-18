@@ -112,7 +112,7 @@
 
 <!-- Scripts para Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
+<script>/*
   let humidityChart, vibrationChart, displacementXChart, displacementYChart, displacementZChart;
 
   // Função para inicializar os gráficos
@@ -253,6 +253,72 @@
         .then(data => console.log('Dados atualizados:', data))
         .catch(error => console.error('Erro ao atualizar:', error));
     }, 10000);
+  });*/  
+  let humidityChart;
+
+  // Função para criar o gráfico
+  function createChart() {
+    const ctx = document.getElementById('humidityChart').getContext('2d');
+    humidityChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Umidade (%)',
+            data: [],
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1,
+            fill: true,
+          },
+        ],
+      },
+      options: {
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              unit: 'second',
+            },
+            title: {
+              display: true,
+              text: 'Data e Hora',
+            },
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Umidade (%)',
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // Função para buscar os dados do servidor e atualizar o gráfico
+  async function fetchAndUpdateChart() {
+    try {
+      const response = await fetch('/dados-sensores');
+      const data = await response.json();
+
+      // Atualiza os dados do gráfico
+      humidityChart.data.labels = data.graficos.datas;
+      humidityChart.data.datasets[0].data = data.graficos.umidades;
+      humidityChart.update();
+    } catch (error) {
+      console.error('Erro ao buscar dados:', error);
+    }
+  }
+
+  // Inicializa o gráfico quando a página é carregada
+  document.addEventListener('DOMContentLoaded', () => {
+    createChart();
+
+    // Atualiza o gráfico a cada 10 segundos
+    setInterval(fetchAndUpdateChart, 10000);
   });
 </script>
 {% endblock %}
