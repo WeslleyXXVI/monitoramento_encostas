@@ -1,12 +1,12 @@
 <!--INDEX QUE O RONALDO CRIOU-->
 <!-- templates/index.html -->
-
+<!--
 {% extends "layout.html" %}
 
 {% block content %}
 <h1 class="text-center text-primary mb-4">SysMonRisk</h1>
 <div class="row">
-  <!-- Card Data e Hora -->
+  Card Data e Hora
   <div class="col-md-12 mb-4">
     <div class="card text-center bg-dark text-light">
       <div class="card-header">Data e Hora</div>
@@ -16,7 +16,7 @@
     </div>
   </div>
 
-  <!-- Card Umidade -->
+  Card Umidade
   <div class="col-md-4 mb-4">
     <div class="card text-center bg-dark text-light">
       <div class="card-header">Umidade</div>
@@ -27,7 +27,7 @@
     </div>
   </div>
 
-  <!-- Card Vibração -->
+  Card Vibração
   <div class="col-md-4 mb-4">
     <div class="card text-center bg-dark text-light">
       <div class="card-header">Vibração</div>
@@ -38,8 +38,8 @@
     </div>
   </div>
 
-  <!-- Card Deslocamento -->
-  <!-- Card Deslocamento -->
+  
+  Card Deslocamento
   <div class="col-md-4 mb-4">
     <div class="card text-center bg-dark text-light">
       <div class="card-header">Deslocamento</div>
@@ -53,8 +53,8 @@
   </div>
 </div>
 
-<!-- Modais para Gráficos -->
-<!-- Modal Umidade -->
+Modais para Gráficos
+Modal Umidade
 <div class="modal fade" id="humidityModal" tabindex="-1" aria-labelledby="humidityModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content bg-dark text-light">
@@ -72,7 +72,7 @@
   </div>
 </div>
 
-<!-- Modal Vibração -->
+Modal Vibração
 <div class="modal fade" id="vibrationModal" tabindex="-1" aria-labelledby="vibrationModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content bg-dark text-light">
@@ -90,7 +90,7 @@
   </div>
 </div>
 
-<!-- Modal Deslocamento -->
+Modal Deslocamento
 <div class="modal fade" id="displacementModal" tabindex="-1" aria-labelledby="displacementModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content bg-dark text-light">
@@ -110,7 +110,7 @@
   </div>
 </div>
 
-<!-- Scripts para Chart.js -->
+Scripts para Chart.js
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   // Função para criar o gráfico
@@ -178,6 +178,188 @@
     setInterval(fetchAndUpdateChart, 10000);
   });
 </script>
+{% endblock %}
+-->
+
+{% extends "layout.html" %}
+
+{% block content %}
+<h1 class="text-center text-primary mb-4">SYSMONRISK</h1>
+<div class="row">
+  <!-- Card Data e Hora -->
+  <div class="col-md-12 mb-4">
+    <div class="card text-center bg-dark text-light">
+      <div class="card-header">
+        Data e Hora
+      </div>
+      <div class="card-body">
+        <h5 class="card-title" id="dataHora">{{ ultimo_dado[1] }}</h5>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Umidade -->
+  <div class="col-md-4 mb-4">
+    <div class="card text-center bg-dark text-light">
+      <div class="card-header">
+        Umidade
+      </div>
+      <div class="card-body">
+        <p class="card-text display-6" id="umidade">{{ ultimo_dado[2] }}%</p>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#humidityModal">Gráficos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Vibração -->
+  <div class="col-md-4 mb-4">
+    <div class="card text-center bg-dark text-light">
+      <div class="card-header">
+        Vibração
+      </div>
+      <div class="card-body">
+        <p class="card-text display-6" id="vibracao">{{ ultimo_dado[3] }} Hz</p>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#vibrationModal">Gráficos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Deslocamento -->
+  <div class="col-md-4 mb-4">
+    <div class="card text-center bg-dark text-light">
+      <div class="card-header">
+        Deslocamento
+      </div>
+      <div class="card-body">
+        <p class="card-text" id="deslocamentoX">X: {{ ultimo_dado[4] }} mm</p>
+        <p class="card-text" id="deslocamentoY">Y: {{ ultimo_dado[5] }} mm</p>
+        <p class="card-text" id="deslocamentoZ">Z: {{ ultimo_dado[6] }} mm</p>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#displacementModal">Gráficos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modais para Gráficos -->
+<!-- Modal Umidade -->
+<div class="modal fade" id="humidityModal" tabindex="-1" aria-labelledby="humidityModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title" id="humidityModalLabel">Gráfico de Umidade</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <canvas id="humidityChart" width="400" height="200"></canvas>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Vibração -->
+<div class="modal fade" id="vibrationModal" tabindex="-1" aria-labelledby="vibrationModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title" id="vibrationModalLabel">Gráfico de Vibração</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <canvas id="vibrationChart" width="400" height="200"></canvas>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Deslocamento -->
+<div class="modal fade" id="displacementModal" tabindex="-1" aria-labelledby="displacementModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content bg-dark text-light">
+      <div class="modal-header">
+        <h5 class="modal-title" id="displacementModalLabel">Gráficos de Deslocamento</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <canvas id="displacementXChart" width="400" height="200"></canvas>
+        <canvas id="displacementYChart" width="400" height="200" class="mt-4"></canvas>
+        <canvas id="displacementZChart" width="400" height="200" class="mt-4"></canvas>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts para Chart.js e AJAX -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Inicialização dos gráficos com dados vazios
+  const ctxHumidity = document.getElementById('humidityChart').getContext('2d');
+  const humidityChart = new Chart(ctxHumidity, { type: 'line', data: {}, options: {} });
+
+  const ctxVibration = document.getElementById('vibrationChart').getContext('2d');
+  const vibrationChart = new Chart(ctxVibration, { type: 'line', data: {}, options: {} });
+
+  const ctxDisplacementX = document.getElementById('displacementXChart').getContext('2d');
+  const displacementXChart = new Chart(ctxDisplacementX, { type: 'line', data: {}, options: {} });
+
+  const ctxDisplacementY = document.getElementById('displacementYChart').getContext('2d');
+  const displacementYChart = new Chart(ctxDisplacementY, { type: 'line', data: {}, options: {} });
+
+  const ctxDisplacementZ = document.getElementById('displacementZChart').getContext('2d');
+  const displacementZChart = new Chart(ctxDisplacementZ, { type: 'line', data: {}, options: {} });
+
+  // Função para carregar os dados via AJAX
+  function carregarDadosGraficos() {
+    fetch('/dados_graficos')
+      .then(response => response.json())
+      .then(data => {
+        // Atualizar os gráficos
+        humidityChart.data = {
+          labels: data.datas,
+          datasets: [{ label: 'Umidade (%)', data: data.umidades, borderColor: 'blue', fill: false }]
+        };
+        humidityChart.update();
+
+        vibrationChart.data = {
+          labels: data.datas,
+          datasets: [{ label: 'Vibração (Hz)', data: data.vibracoes, borderColor: 'red', fill: false }]
+        };
+        vibrationChart.update();
+
+        displacementXChart.data = {
+          labels: data.datas,
+          datasets: [{ label: 'Deslocamento X (mm)', data: data.deslocamentoX, borderColor: 'green', fill: false }]
+        };
+        displacementXChart.update();
+
+        displacementYChart.data = {
+          labels: data.datas,
+          datasets: [{ label: 'Deslocamento Y (mm)', data: data.deslocamentoY, borderColor: 'orange', fill: false }]
+        };
+        displacementYChart.update();
+
+        displacementZChart.data = {
+          labels: data.datas,
+          datasets: [{ label: 'Deslocamento Z (mm)', data: data.deslocamentoZ, borderColor: 'purple', fill: false }]
+        };
+        displacementZChart.update();
+      });
+  }
+
+  // Carregar os dados dos gráficos quando os modais forem abertos
+  document.getElementById('humidityModal').addEventListener('shown.bs.modal', carregarDadosGraficos);
+  document.getElementById('vibrationModal').addEventListener('shown.bs.modal', carregarDadosGraficos);
+  document.getElementById('displacementModal').addEventListener('shown.bs.modal', carregarDadosGraficos);
+</script>
+
 {% endblock %}
 
   
