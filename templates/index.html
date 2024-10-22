@@ -13,7 +13,7 @@
         Data e Hora
       </div>
       <div class="card-body">
-        <h5 class="card-title" id="dataHora">{{ ultimo_dado[1] }}</h5>
+        <h5 class="card-title" id="dataHora">{{ ultimo_dado.data_hora }}</h5>
       </div>
     </div>
   </div>
@@ -25,7 +25,7 @@
         Umidade
       </div>
       <div class="card-body">
-        <p class="card-text display-6" id="umidade">{{ ultimo_dado[2] }}%</p>
+        <p class="card-text display-6" id="umidade">{{ ultimo_dado.umidade }}%</p>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#humidityModal">Gráficos</button>
       </div>
     </div>
@@ -38,7 +38,7 @@
         Vibração
       </div>
       <div class="card-body">
-        <p class="card-text display-6" id="vibracao">{{ ultimo_dado[3] }} Hz</p>
+        <p class="card-text display-6" id="vibracao">{{ ultimo_dado.vibracao }} Hz</p>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#vibrationModal">Gráficos</button>
       </div>
     </div>
@@ -51,9 +51,9 @@
         Deslocamento
       </div>
       <div class="card-body">
-        <p class="card-text" id="deslocamentoX">X: {{ ultimo_dado[4] }} mm</p>
-        <p class="card-text" id="deslocamentoY">Y: {{ ultimo_dado[5] }} mm</p>
-        <p class="card-text" id="deslocamentoZ">Z: {{ ultimo_dado[6] }} mm</p>
+        <p class="card-text" id="deslocamentoX">X: {{ ultimo_dado.deslocamento_x }} mm</p>
+        <p class="card-text" id="deslocamentoY">Y: {{ ultimo_dado.deslocamento_y }} mm</p>
+        <p class="card-text" id="deslocamentoZ">Z: {{ ultimo_dado.deslocamento_z }} mm</p>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#displacementModal">Gráficos</button>
       </div>
     </div>
