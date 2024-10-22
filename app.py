@@ -265,27 +265,27 @@ import ssl
 import json
 import certifi
 from datetime import datetime
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 
 # Carregar variáveis de ambiente do arquivo .env
-load_dotenv()
+#load_dotenv()
 
 # Configurações MQTT
-MQTT_BROKER = os.getenv('MQTT_BROKER')
+MQTT_BROKER = os.getenv('MQTT_BROKER', "e66b9d6c631847079aa74758720c6fbe.s1.eu.hivemq.cloud")
 MQTT_PORT = int(os.getenv('MQTT_PORT', 8883))
 MQTT_TOPIC = os.getenv('MQTT_TOPIC', "sensores/dados")
-MQTT_USERNAME = os.getenv('MQTT_USERNAME')
-MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')  # Use variáveis de ambiente para segurança
+MQTT_USERNAME = os.getenv('MQTT_USERNAME', "weslley.almeida")
+MQTT_PASSWORD = os.getenv('MQTT_PASSWORD',"Naruto12!")  # Use variáveis de ambiente para segurança
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY')
+app.secret_key = os.getenv('SECRET_KEY', 'mysecretkey')
 
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
 # Configuração do banco de dados PostgreSQL (Railway)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:TXhcBjuVGMExFBSJHEgUONIAcwufdKln@junction.proxy.rlwy.net:59480/railway')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -295,14 +295,8 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # Modelos de banco de dados usando SQLAlchemy
-class Usuario(db.Model):
-    __tablename__ = 'usuarios'
-    id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), nullable=False, unique=True)
-    senha = db.Column(db.String(256), nullable=False)
 
-class Sensor(db.Model):
+class SensorData(db.Model):
     __tablename__ = 'sensores'
     id = db.Column(db.Integer, primary_key=True)
     data_hora = db.Column(db.DateTime, nullable=False)
@@ -311,6 +305,13 @@ class Sensor(db.Model):
     posicaoX = db.Column(db.Float, nullable=False)
     posicaoY = db.Column(db.Float, nullable=False)
     posicaoZ = db.Column(db.Float, nullable=False)
+
+class Usuario(db.Model):
+    __tablename__ = 'usuarios'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), nullable=False, unique=True)
+    senha = db.Column(db.String(256), nullable=False)
 
 # Função para verificar se o usuário existe no banco de dados
 def usuario_existe(email):
@@ -323,13 +324,57 @@ def criar_usuario(nome, email, senha):
     db.session.add(novo_usuario)
     db.session.commit()
 
+# Função callback quando a conexão MQTT é estabelecida
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        print("Conectado ao broker MQTT")
+        client.subscribe(MQTT_TOPIC)
+    else:
+        print(f"Falha na conexão com o broker MQTT. Código: {rc}")
+
+# Função callback quando uma mensagem MQTT é recebida
+def on_message(client, userdata, msg):
+    try:
+        # Decodificar a mensagem recebida
+        payload = json.loads(msg.payload)
+        print(f"Mensagem recebida: {payload}")
+
+        # Criar um novo registro de dados no banco de dados
+        sensor_data = SensorData(
+            data_hora=payload["data_hora"],
+            umidade=payload["umidade"],
+            vibracao=payload["vibracao"],
+            deslocamento_x=payload["deslocamento_x"],
+            deslocamento_y=payload["deslocamento_y"],
+            deslocamento_z=payload["deslocamento_z"]
+        )
+
+        # Salvar os dados no banco de dados
+        db.session.add(sensor_data)
+        db.session.commit()
+        print("Dados armazenados no banco de dados.")
+
+    except Exception as e:
+        print(f"Erro ao processar a mensagem: {e}")
+
+# Configurar o cliente MQTT
+mqtt_client = mqtt.Client("PostgreSQL_Subscriber")
+mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+mqtt_client.tls_set(certifi.where(), cert_reqs=ssl.CERT_NONE)
+mqtt_client.on_connect = on_connect
+mqtt_client.on_message = on_message
+
+# Conectar ao broker MQTT e iniciar o loop
+mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+mqtt_client.loop_start()
+
 # Função para buscar dados de sensores do banco de dados
 def buscar_dados_sensores():
-    return Sensor.query.order_by(Sensor.data_hora.asc()).all()
+    return SensorData.query.order_by(SensorData.data_hora.asc()).all()
 
 # Função para buscar o último dado
 def buscar_ultimo_dado():
-    return Sensor.query.order_by(Sensor.data_hora.desc()).first()
+    return SensorData.query.order_by(SensorData.data_hora.desc()).first()
 
 # Rota para login
 @app.route("/login", methods=["GET", "POST"])
@@ -387,7 +432,7 @@ def recebe_data():
             posicaoY = float(posicaoY)
             posicaoZ = float(posicaoZ)
             data_hora = datetime.now()
-            novo_sensor = Sensor(
+            novo_sensor = SensorData(
                 data_hora=data_hora,
                 umidade=umidade,
                 vibracao=vibracao,
@@ -410,7 +455,7 @@ def recebe_data():
 def index():
     ultimo_dado = buscar_ultimo_dado()
     # Dados para os gráficos
-    sensores = Sensor.query.order_by(Sensor.data_hora.desc()).limit(50).all()
+    sensores = SensorData.query.order_by(SensorData.data_hora.desc()).limit(50).all()
     sensores.reverse()  # Para colocar em ordem ascendente
 
     chart_data = {
@@ -426,7 +471,7 @@ def index():
 
 @app.route('/dados_graficos')
 def dados_graficos():
-    sensores = Sensor.query.order_by(Sensor.data_hora.desc()).limit(50).all()
+    sensores = SensorData.query.order_by(SensorData.data_hora.desc()).limit(50).all()
     sensores.reverse()  # Para colocar em ordem ascendente
 
     chart_data = {
