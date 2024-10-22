@@ -298,9 +298,9 @@ class SensorData(db.Model):
     data_hora = db.Column(db.DateTime, nullable=False)
     umidade = db.Column(db.Float, nullable=False)
     vibracao = db.Column(db.Float, nullable=False)
-    posicaoX = db.Column(db.Float, nullable=False)
-    posicaoY = db.Column(db.Float, nullable=False)
-    posicaoZ = db.Column(db.Float, nullable=False)
+    deslocamento_x = db.Column(db.Float, nullable=False)
+    deslocamento_y = db.Column(db.Float, nullable=False)
+    deslocamento_z = db.Column(db.Float, nullable=False)
 
 class Usuario(db.Model):
     __tablename__ = 'usuarios'
@@ -349,9 +349,9 @@ def on_message(client, userdata, msg):
             data_hora=data_hora,
             umidade=float(payload["umidade"]),
             vibracao=float(payload["vibracao"]),
-            posicaoX=float(payload["posicaoX"]),
-            posicaoY=float(payload["posicaoY"]),
-            posicaoZ=float(payload["posicaoZ"])
+            deslocamento_x=float(payload["deslocamento_x"]),
+            deslocamento_y=float(payload["deslocamento_y"]),
+            deslocamento_z=float(payload["deslocamento_z"])
         )
 
         # Salvar os dados no banco de dados
@@ -435,24 +435,24 @@ def cadastro():
 def recebe_data():
     umidade = request.form.get('umidade')
     vibracao = request.form.get('vibracao')
-    posicaoX = request.form.get('posicaoX')
-    posicaoY = request.form.get('posicaoY')
-    posicaoZ = request.form.get('posicaoZ')
-    if umidade and vibracao and posicaoX and posicaoY and posicaoZ:
+    deslocamento_x = request.form.get('deslocamento_x')
+    deslocamento_y = request.form.get('deslocamento_y')
+    deslocamento_z = request.form.get('deslocamento_z')
+    if umidade and vibracao and deslocamento_x and deslocamento_y and deslocamento_z:
         try:
             umidade = float(umidade)
             vibracao = float(vibracao)
-            posicaoX = float(posicaoX)
-            posicaoY = float(posicaoY)
-            posicaoZ = float(posicaoZ)
+            deslocamento_x = float(deslocamento_x)
+            deslocamento_y = float(deslocamento_y)
+            deslocamento_z = float(deslocamento_z)
             data_hora = datetime.now()
             novo_sensor = SensorData(
                 data_hora=data_hora,
                 umidade=umidade,
                 vibracao=vibracao,
-                posicaoX=posicaoX,
-                posicaoY=posicaoY,
-                posicaoZ=posicaoZ
+                deslocamento_x=deslocamento_x,
+                deslocamento_y=deslocamento_y,
+                deslocamento_z=deslocamento_z
             )
             db.session.add(novo_sensor)
             db.session.commit()
@@ -476,9 +476,9 @@ def index():
         'datas': [sensor.data_hora.strftime('%Y-%m-%d %H:%M:%S') for sensor in sensores],
         'umidades': [sensor.umidade for sensor in sensores],
         'vibracoes': [sensor.vibracao for sensor in sensores],
-        'deslocamentoX': [sensor.posicaoX for sensor in sensores],
-        'deslocamentoY': [sensor.posicaoY for sensor in sensores],
-        'deslocamentoZ': [sensor.posicaoZ for sensor in sensores]
+        'deslocamentoX': [sensor.deslocamento_x for sensor in sensores],
+        'deslocamentoY': [sensor.deslocamento_y for sensor in sensores],
+        'deslocamentoZ': [sensor.deslocamento_z for sensor in sensores]
     }
 
     return render_template('index.html', ultimo_dado=ultimo_dado, chart_data=chart_data)
@@ -492,9 +492,9 @@ def dados_graficos():
         'datas': [sensor.data_hora.strftime('%Y-%m-%d %H:%M:%S') for sensor in sensores],
         'umidades': [sensor.umidade for sensor in sensores],
         'vibracoes': [sensor.vibracao for sensor in sensores],
-        'deslocamentoX': [sensor.posicaoX for sensor in sensores],
-        'deslocamentoY': [sensor.posicaoY for sensor in sensores],
-        'deslocamentoZ': [sensor.posicaoZ for sensor in sensores]
+        'deslocamentoX': [sensor.deslocamento_x for sensor in sensores],
+        'deslocamentoY': [sensor.deslocamento_y for sensor in sensores],
+        'deslocamentoZ': [sensor.deslocamento_z for sensor in sensores]
     }
     return jsonify(chart_data)
 
