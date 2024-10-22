@@ -1,4 +1,4 @@
-import os
+"""import os
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import paho.mqtt.client as mqtt
@@ -109,13 +109,6 @@ mqtt_client.loop_start()
 
 # Rotas Flask
 #ROTA QUE FUNCIONA
-"""@app.route('/')
-def index():
-    if 'usuario' in session:
-        ultimo_dado = SensorData.query.order_by(SensorData.id.desc()).first()
-        return render_template('index.html', usuario=session['usuario'], ultimo_dado=ultimo_dado)
-    else:
-        return redirect(url_for('login'))"""
 
 # Rota para a página principal
 @app.route('/')
@@ -128,7 +121,7 @@ def index():
 
 #ROTA DE TESTE
 # **Nova Rota: Fornece dados para gráficos e última leitura**
-"""@app.route('/dados-sensores')
+@app.route('/dados-sensores')
 def dados_sensores():
     if 'usuario' in session:
         # Buscar o último dado dos sensores
@@ -159,7 +152,7 @@ def dados_sensores():
 
         return jsonify(dados)
     else:
-        return jsonify({"error": "Usuário não autenticado"}), 401"""
+        return jsonify({"error": "Usuário não autenticado"}), 401
 
 @app.route('/dados-sensores')
 def dados_sensores():
@@ -260,4 +253,202 @@ def dados_graficos():
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000)"""
+
+import os
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask_sqlalchemy import SQLAlchemy
+import paho.mqtt.client as mqtt
+from flask_session import Session
+import hashlib
+import ssl
+import json
+import certifi
+from datetime import datetime
+from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente do arquivo .env
+load_dotenv()
+
+# Configurações MQTT
+MQTT_BROKER = os.getenv('MQTT_BROKER')
+MQTT_PORT = int(os.getenv('MQTT_PORT', 8883))
+MQTT_TOPIC = os.getenv('MQTT_TOPIC', "sensores/dados")
+MQTT_USERNAME = os.getenv('MQTT_USERNAME')
+MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')  # Use variáveis de ambiente para segurança
+
+app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY')
+
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
+
+# Configuração do banco de dados PostgreSQL (Railway)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
+
+# Função para hash de senha
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+# Modelos de banco de dados usando SQLAlchemy
+class Usuario(db.Model):
+    __tablename__ = 'usuarios'
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), nullable=False, unique=True)
+    senha = db.Column(db.String(256), nullable=False)
+
+class Sensor(db.Model):
+    __tablename__ = 'sensores'
+    id = db.Column(db.Integer, primary_key=True)
+    data_hora = db.Column(db.DateTime, nullable=False)
+    umidade = db.Column(db.Float, nullable=False)
+    vibracao = db.Column(db.Float, nullable=False)
+    posicaoX = db.Column(db.Float, nullable=False)
+    posicaoY = db.Column(db.Float, nullable=False)
+    posicaoZ = db.Column(db.Float, nullable=False)
+
+# Função para verificar se o usuário existe no banco de dados
+def usuario_existe(email):
+    return Usuario.query.filter_by(email=email).first()
+
+# Função para criar usuário
+def criar_usuario(nome, email, senha):
+    hashed_password = hash_password(senha)
+    novo_usuario = Usuario(nome=nome, email=email, senha=hashed_password)
+    db.session.add(novo_usuario)
+    db.session.commit()
+
+# Função para buscar dados de sensores do banco de dados
+def buscar_dados_sensores():
+    return Sensor.query.order_by(Sensor.data_hora.asc()).all()
+
+# Função para buscar o último dado
+def buscar_ultimo_dado():
+    return Sensor.query.order_by(Sensor.data_hora.desc()).first()
+
+# Rota para login
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email")
+        senha = request.form.get("password")
+        if not email or not senha:
+            return render_template("login.html", error="Preencha todos os campos.")
+        usuario = usuario_existe(email)
+        if usuario:
+            if usuario.senha == hash_password(senha):
+                session["usuario"] = email
+                return redirect(url_for("index"))
+            else:
+                return render_template("login.html", error="Senha incorreta")
+        else:
+            return render_template("login.html", error="Usuário não existe. Deseja se cadastrar?")
+    return render_template("login.html")
+
+# Rota para cadastro
+@app.route("/cadastro", methods=["GET", "POST"])
+def cadastro():
+    if request.method == "POST":
+        nome = request.form.get("nome")
+        email = request.form.get("email")
+        senha = request.form.get("password")
+        confirm_password = request.form.get("confirm_password")
+        if not nome or not email or not senha or not confirm_password:
+            error = "Todos os campos são obrigatórios."
+            return render_template("cadastro.html", error=error)
+        if senha != confirm_password:
+            error = "As senhas não coincidem."
+            return render_template("cadastro.html", error=error)
+        if usuario_existe(email):
+            error = "Este e-mail já está cadastrado."
+            return render_template("cadastro.html", error=error)
+        criar_usuario(nome, email, senha)
+        return redirect(url_for("login"))
+    return render_template("cadastro.html")
+
+# Rota para receber dados dos sensores
+@app.route("/sensores", methods=["POST"])
+def recebe_data():
+    umidade = request.form.get('umidade')
+    vibracao = request.form.get('vibracao')
+    posicaoX = request.form.get('posicaoX')
+    posicaoY = request.form.get('posicaoY')
+    posicaoZ = request.form.get('posicaoZ')
+    if umidade and vibracao and posicaoX and posicaoY and posicaoZ:
+        try:
+            umidade = float(umidade)
+            vibracao = float(vibracao)
+            posicaoX = float(posicaoX)
+            posicaoY = float(posicaoY)
+            posicaoZ = float(posicaoZ)
+            data_hora = datetime.now()
+            novo_sensor = Sensor(
+                data_hora=data_hora,
+                umidade=umidade,
+                vibracao=vibracao,
+                posicaoX=posicaoX,
+                posicaoY=posicaoY,
+                posicaoZ=posicaoZ
+            )
+            db.session.add(novo_sensor)
+            db.session.commit()
+            return 'Dados obtidos e armazenados com sucesso', 200
+        except ValueError as e:
+            return f'Erro na conversão dos dados: {e}', 400
+        except Exception as e:
+            return f'Erro ao inserir dados: {e}', 500
+    else:
+        return 'Parâmetro(s) ausente(s)', 400
+
+# Rota para página principal
+@app.route('/')
+def index():
+    ultimo_dado = buscar_ultimo_dado()
+    # Dados para os gráficos
+    sensores = Sensor.query.order_by(Sensor.data_hora.desc()).limit(50).all()
+    sensores.reverse()  # Para colocar em ordem ascendente
+
+    chart_data = {
+        'datas': [sensor.data_hora.strftime('%Y-%m-%d %H:%M:%S') for sensor in sensores],
+        'umidades': [sensor.umidade for sensor in sensores],
+        'vibracoes': [sensor.vibracao for sensor in sensores],
+        'deslocamentoX': [sensor.posicaoX for sensor in sensores],
+        'deslocamentoY': [sensor.posicaoY for sensor in sensores],
+        'deslocamentoZ': [sensor.posicaoZ for sensor in sensores]
+    }
+
+    return render_template('index.html', ultimo_dado=ultimo_dado, chart_data=chart_data)
+
+@app.route('/dados_graficos')
+def dados_graficos():
+    sensores = Sensor.query.order_by(Sensor.data_hora.desc()).limit(50).all()
+    sensores.reverse()  # Para colocar em ordem ascendente
+
+    chart_data = {
+        'datas': [sensor.data_hora.strftime('%Y-%m-%d %H:%M:%S') for sensor in sensores],
+        'umidades': [sensor.umidade for sensor in sensores],
+        'vibracoes': [sensor.vibracao for sensor in sensores],
+        'deslocamentoX': [sensor.posicaoX for sensor in sensores],
+        'deslocamentoY': [sensor.posicaoY for sensor in sensores],
+        'deslocamentoZ': [sensor.posicaoZ for sensor in sensores]
+    }
+    return jsonify(chart_data)
+
+# Rota para logout
+@app.route("/logout")
+def logout():
+    session.pop("usuario", None)
+    return redirect(url_for("login"))
+
+if __name__ == "__main__":
+    # Inicializar o banco de dados
+    with app.app_context():
+        db.create_all()
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
+
