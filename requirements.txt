@@ -8,3 +8,4 @@ paho-mqtt==1.6.1
 certifi
 Flask-Session
 python-dotenv
+Flask-Migrate

@@ -1,4 +1,5 @@
 import os
+from flask_migrate import Migrate
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import paho.mqtt.client as mqtt
@@ -31,6 +32,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)  # Inicializar o Flask-Migrate
 
 # Função para hash de senha
 def hash_password(password):
@@ -55,9 +57,31 @@ class Usuario(db.Model):
     email = db.Column(db.String(100), nullable=False, unique=True)
     senha = db.Column(db.String(256), nullable=False)
 
+def atualizar_data_hora():
+    print("Iniciando atualização de data_hora")
+    with app.app_context():
+        sensores = SensorData.query.all()
+        for sensor in sensores:
+            if isinstance(sensor.data_hora, str):
+                try:
+                    # Tente converter a string em datetime
+                    sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S')
+                    db.session.add(sensor)
+                except ValueError:
+                    try:
+                        sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S.%f')
+                        db.session.add(sensor)
+                    except ValueError:
+                        print(f"Formato de data inválido para o registro ID {sensor.id}: {sensor.data_hora}")
+                        continue
+        db.session.commit()
+        print("Atualização de data_hora concluída.")
+
 # Criar as tabelas se não existirem
 with app.app_context():
     db.create_all()
+    # Atualizar os registros existentes
+    atualizar_data_hora()
 
 # Função para verificar se o usuário existe no banco de dados
 def usuario_existe(email):
@@ -117,26 +141,6 @@ def buscar_dados_sensores():
 # Função para buscar o último dado
 def buscar_ultimo_dado():
     return SensorData.query.order_by(SensorData.data_hora.desc()).first()
-
-def atualizar_data_hora():
-    with app.app_context():
-        sensores = SensorData.query.all()
-        for sensor in sensores:
-            if isinstance(sensor.data_hora, str):
-                try:
-                    # Tente converter a string em datetime
-                    sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S')
-                except ValueError:
-                    # Tentar outro formato se necessário
-                    try:
-                        sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S.%f')
-                    except ValueError:
-                        print(f"Formato de data inválido para o registro ID {sensor.id}: {sensor.data_hora}")
-                        continue  # Pula para o próximo registro
-                db.session.add(sensor)
-        db.session.commit()
-        print("Atualização de data_hora concluída.")
-
 
 # Rota para login
 @app.route("/login", methods=["GET", "POST"])
@@ -216,20 +220,24 @@ def recebe_data():
 @app.route('/')
 def index():
     ultimo_dado = buscar_ultimo_dado()
-    # Dados para os gráficos
     sensores = SensorData.query.order_by(SensorData.data_hora.desc()).limit(50).all()
-    sensores.reverse()  # Para colocar em ordem ascendente
+    sensores.reverse()
 
     chart_data = {
-        'datas': [sensor.data_hora.strftime('%Y-%m-%d %H:%M:%S') for sensor in sensores],
+        'datas': [
+            (datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S') if isinstance(sensor.data_hora, str) else sensor.data_hora).strftime('%Y-%m-%d %H:%M:%S')
+            for sensor in sensores
+        ],
         'umidades': [sensor.umidade for sensor in sensores],
         'vibracoes': [sensor.vibracao for sensor in sensores],
         'deslocamentoX': [sensor.deslocamento_x for sensor in sensores],
         'deslocamentoY': [sensor.deslocamento_y for sensor in sensores],
         'deslocamentoZ': [sensor.deslocamento_z for sensor in sensores]
-    }
+}
+
 
     return render_template('index.html', ultimo_dado=ultimo_dado, chart_data=chart_data)
+
 
 @app.route('/dados_graficos')
 def dados_graficos():
@@ -256,9 +264,6 @@ if __name__ == "__main__":
     # Inicializar o banco de dados
     with app.app_context():
         db.create_all()
-
-        # Atualizar os registros existentes
-        atualizar_data_hora()
 
     # Configurar o cliente MQTT
     mqtt_client = mqtt.Client("PostgreSQL_Subscriber")
