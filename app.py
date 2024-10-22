@@ -265,17 +265,13 @@ import ssl
 import json
 import certifi
 from datetime import datetime
-#from dotenv import load_dotenv
-
-# Carregar variáveis de ambiente do arquivo .env
-#load_dotenv()
 
 # Configurações MQTT
-MQTT_BROKER = os.getenv('MQTT_BROKER', "e66b9d6c631847079aa74758720c6fbe.s1.eu.hivemq.cloud")
+MQTT_BROKER = os.getenv('MQTT_BROKER')
 MQTT_PORT = int(os.getenv('MQTT_PORT', 8883))
 MQTT_TOPIC = os.getenv('MQTT_TOPIC', "sensores/dados")
-MQTT_USERNAME = os.getenv('MQTT_USERNAME', "weslley.almeida")
-MQTT_PASSWORD = os.getenv('MQTT_PASSWORD',"Naruto12!")  # Use variáveis de ambiente para segurança
+MQTT_USERNAME = os.getenv('MQTT_USERNAME')
+MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'mysecretkey')
@@ -285,7 +281,7 @@ app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
 # Configuração do banco de dados PostgreSQL (Railway)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:TXhcBjuVGMExFBSJHEgUONIAcwufdKln@junction.proxy.rlwy.net:59480/railway')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -302,9 +298,9 @@ class SensorData(db.Model):
     data_hora = db.Column(db.DateTime, nullable=False)
     umidade = db.Column(db.Float, nullable=False)
     vibracao = db.Column(db.Float, nullable=False)
-    deslocamento_x = db.Column(db.Float, nullable=False)
-    deslocamento_y = db.Column(db.Float, nullable=False)
-    deslocamento_z = db.Column(db.Float, nullable=False)
+    posicaoX = db.Column(db.Float, nullable=False)
+    posicaoY = db.Column(db.Float, nullable=False)
+    posicaoZ = db.Column(db.Float, nullable=False)
 
 class Usuario(db.Model):
     __tablename__ = 'usuarios'
@@ -313,7 +309,7 @@ class Usuario(db.Model):
     email = db.Column(db.String(100), nullable=False, unique=True)
     senha = db.Column(db.String(256), nullable=False)
 
-# Criar a tabela 'sensores' se não existir
+# Criar as tabelas se não existirem
 with app.app_context():
     db.create_all()
 
@@ -343,14 +339,19 @@ def on_message(client, userdata, msg):
         payload = json.loads(msg.payload)
         print(f"Mensagem recebida: {payload}")
 
+        # Converter a string data_hora em objeto datetime
+        data_hora_str = payload["data_hora"]
+        # Ajuste o formato da data conforme necessário
+        data_hora = datetime.strptime(data_hora_str, '%Y-%m-%d %H:%M:%S')
+
         # Criar um novo registro de dados no banco de dados
         sensor_data = SensorData(
-            data_hora=payload["data_hora"],
-            umidade=payload["umidade"],
-            vibracao=payload["vibracao"],
-            deslocamento_x=payload["deslocamento_x"],
-            deslocamento_y=payload["deslocamento_y"],
-            deslocamento_z=payload["deslocamento_z"]
+            data_hora=data_hora,
+            umidade=float(payload["umidade"]),
+            vibracao=float(payload["vibracao"]),
+            posicaoX=float(payload["posicaoX"]),
+            posicaoY=float(payload["posicaoY"]),
+            posicaoZ=float(payload["posicaoZ"])
         )
 
         # Salvar os dados no banco de dados
@@ -360,6 +361,8 @@ def on_message(client, userdata, msg):
 
     except Exception as e:
         print(f"Erro ao processar a mensagem: {e}")
+        import traceback
+        traceback.print_exc()
 
 # Função para buscar dados de sensores do banco de dados
 def buscar_dados_sensores():
@@ -368,6 +371,24 @@ def buscar_dados_sensores():
 # Função para buscar o último dado
 def buscar_ultimo_dado():
     return SensorData.query.order_by(SensorData.data_hora.desc()).first()
+
+def atualizar_data_hora():
+    with app.app_context():
+        sensores = SensorData.query.all()
+        for sensor in sensores:
+            if isinstance(sensor.data_hora, str):
+                try:
+                    # Tente converter a string em datetime
+                    sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    # Se o formato for diferente, tente outro formato ou trate o erro
+                    print(f"Formato de data inválido para o registro ID {sensor.id}: {sensor.data_hora}")
+            else:
+                # Já é um objeto datetime, não precisa fazer nada
+                pass
+        # Salvar as alterações no banco de dados
+        db.session.commit()
+        print("Atualização concluída.")
 
 # Rota para login
 @app.route("/login", methods=["GET", "POST"])
@@ -487,7 +508,10 @@ if __name__ == "__main__":
     # Inicializar o banco de dados
     with app.app_context():
         db.create_all()
-    
+
+        # Atualizar os registros existentes
+        atualizar_data_hora()
+
     # Configurar o cliente MQTT
     mqtt_client = mqtt.Client("PostgreSQL_Subscriber")
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
@@ -499,7 +523,9 @@ if __name__ == "__main__":
     mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
     mqtt_client.loop_start()
 
+    # Obter a porta do ambiente ou usar 5000 como padrão
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+
 
 
