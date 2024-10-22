@@ -265,11 +265,14 @@ import ssl
 import json
 import certifi
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configurações MQTT
 MQTT_BROKER = os.getenv('MQTT_BROKER')
-MQTT_PORT = int(os.getenv('MQTT_PORT', 8883))
-MQTT_TOPIC = os.getenv('MQTT_TOPIC', "sensores/dados")
+MQTT_PORT = int(os.getenv('MQTT_PORT', '8883'))
+MQTT_TOPIC = os.getenv('MQTT_TOPIC')
 MQTT_USERNAME = os.getenv('MQTT_USERNAME')
 MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')
 
@@ -381,14 +384,16 @@ def atualizar_data_hora():
                     # Tente converter a string em datetime
                     sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S')
                 except ValueError:
-                    # Se o formato for diferente, tente outro formato ou trate o erro
-                    print(f"Formato de data inválido para o registro ID {sensor.id}: {sensor.data_hora}")
-            else:
-                # Já é um objeto datetime, não precisa fazer nada
-                pass
-        # Salvar as alterações no banco de dados
+                    # Tentar outro formato se necessário
+                    try:
+                        sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S.%f')
+                    except ValueError:
+                        print(f"Formato de data inválido para o registro ID {sensor.id}: {sensor.data_hora}")
+                        continue  # Pula para o próximo registro
+                db.session.add(sensor)
         db.session.commit()
-        print("Atualização concluída.")
+        print("Atualização de data_hora concluída.")
+
 
 # Rota para login
 @app.route("/login", methods=["GET", "POST"])
