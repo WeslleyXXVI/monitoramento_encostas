@@ -302,9 +302,9 @@ class SensorData(db.Model):
     data_hora = db.Column(db.DateTime, nullable=False)
     umidade = db.Column(db.Float, nullable=False)
     vibracao = db.Column(db.Float, nullable=False)
-    posicaoX = db.Column(db.Float, nullable=False)
-    posicaoY = db.Column(db.Float, nullable=False)
-    posicaoZ = db.Column(db.Float, nullable=False)
+    deslocamento_x = db.Column(db.Float, nullable=False)
+    deslocamento_y = db.Column(db.Float, nullable=False)
+    deslocamento_z = db.Column(db.Float, nullable=False)
 
 class Usuario(db.Model):
     __tablename__ = 'usuarios'
@@ -312,6 +312,10 @@ class Usuario(db.Model):
     nome = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), nullable=False, unique=True)
     senha = db.Column(db.String(256), nullable=False)
+
+# Criar a tabela 'sensores' se não existir
+with app.app_context():
+    db.create_all()
 
 # Função para verificar se o usuário existe no banco de dados
 def usuario_existe(email):
@@ -356,17 +360,6 @@ def on_message(client, userdata, msg):
 
     except Exception as e:
         print(f"Erro ao processar a mensagem: {e}")
-
-# Configurar o cliente MQTT
-mqtt_client = mqtt.Client("PostgreSQL_Subscriber")
-mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-mqtt_client.tls_set(certifi.where(), cert_reqs=ssl.CERT_NONE)
-mqtt_client.on_connect = on_connect
-mqtt_client.on_message = on_message
-
-# Conectar ao broker MQTT e iniciar o loop
-mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
-mqtt_client.loop_start()
 
 # Função para buscar dados de sensores do banco de dados
 def buscar_dados_sensores():
@@ -494,6 +487,19 @@ if __name__ == "__main__":
     # Inicializar o banco de dados
     with app.app_context():
         db.create_all()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    
+    # Configurar o cliente MQTT
+    mqtt_client = mqtt.Client("PostgreSQL_Subscriber")
+    mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+    mqtt_client.tls_set(certifi.where(), cert_reqs=ssl.CERT_NONE)
+    mqtt_client.on_connect = on_connect
+    mqtt_client.on_message = on_message
+
+    # Conectar ao broker MQTT e iniciar o loop
+    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    mqtt_client.loop_start()
+
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
 
 
