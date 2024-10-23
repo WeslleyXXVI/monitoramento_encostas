@@ -23,19 +23,19 @@ def upgrade():
                existing_type=postgresql.TIMESTAMP(),
                nullable=False)
         batch_op.alter_column('umidade',
-               existing_type=sa.DOUBLE_PRECISION(precision=53),
+               existing_type=postgresql.DOUBLE_PRECISION(precision=53),
                nullable=False)
         batch_op.alter_column('vibracao',
-               existing_type=sa.DOUBLE_PRECISION(precision=53),
+               existing_type=postgresql.DOUBLE_PRECISION(precision=53),
                nullable=False)
         batch_op.alter_column('deslocamento_x',
-               existing_type=sa.DOUBLE_PRECISION(precision=53),
+               existing_type=postgresql.DOUBLE_PRECISION(precision=53),
                nullable=False)
         batch_op.alter_column('deslocamento_y',
-               existing_type=sa.DOUBLE_PRECISION(precision=53),
+               existing_type=postgresql.DOUBLE_PRECISION(precision=53),
                nullable=False)
         batch_op.alter_column('deslocamento_z',
-               existing_type=sa.DOUBLE_PRECISION(precision=53),
+               existing_type=postgresql.DOUBLE_PRECISION(precision=53),
                nullable=False)
 
     # ### end Alembic commands ###
