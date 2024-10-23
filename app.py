@@ -10,6 +10,7 @@ import json
 import certifi
 from datetime import datetime
 from dotenv import load_dotenv
+from flask_cors import CORS
 
 load_dotenv()
 
@@ -21,6 +22,7 @@ MQTT_USERNAME = os.getenv('MQTT_USERNAME')
 MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')
 
 app = Flask(__name__)
+CORS(app)
 app.secret_key = os.getenv('SECRET_KEY', 'mysecretkey')
 
 app.config["SESSION_PERMANENT"] = False
