@@ -1,5 +1,5 @@
 import os
-from flask_migrate import Migrate
+from flask_migrate import Migrate, upgrade
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import paho.mqtt.client as mqtt
@@ -11,6 +11,7 @@ import certifi
 from datetime import datetime
 from dotenv import load_dotenv
 from flask_cors import CORS
+from functools import wraps
 
 load_dotenv()
 
@@ -25,6 +26,7 @@ app = Flask(__name__)
 CORS(app)
 app.secret_key = os.getenv('SECRET_KEY', 'mysecretkey')
 
+# Configurações de Sessão
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
@@ -40,6 +42,7 @@ migrate = Migrate(app, db)  # Inicializar o Flask-Migrate
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+# Dicionário para armazenar as últimas 50 leituras
 historico_leituras = []
 
 # Modelos de banco de dados usando SQLAlchemy
@@ -190,7 +193,7 @@ def login():
     if request.method == "POST":
         email = request.form.get("email")
         senha = request.form.get("password")
-        if not email or not senha:
+        if not email ou não senha:
             return render_template("login.html", error="Preencha todos os campos.")
         usuario = usuario_existe(email)
         if usuario:
@@ -231,50 +234,15 @@ def logout():
     return redirect(url_for("login"))
 
 # Rota para página principal
-"""@app.route('/')
-def index():
-    ultimo_dado = buscar_ultimo_dado()
-    sensores = SensorData.query.order_by(SensorData.data_hora.desc()).limit(50).all()
-    sensores.reverse()
-
-    chart_data = {
-        'datas': [
-            (datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S') if isinstance(sensor.data_hora, str) else sensor.data_hora).strftime('%Y-%m-%d %H:%M:%S')
-            for sensor in sensores
-        ],
-        'umidades': [sensor.umidade for sensor in sensores],
-        'vibracoes': [sensor.vibracao for sensor in sensores],
-        'deslocamentoX': [sensor.deslocamento_x for sensor in sensores],
-        'deslocamentoY': [sensor.deslocamento_y for sensor in sensores],
-        'deslocamentoZ': [sensor.deslocamento_z for sensor in sensores]
-    }
-    
-    return render_template('index.html', ultimo_dado=ultimo_dado, chart_data=chart_data)"""
-
-@app.route('/')
+@app.route("/index")
+@login_required
 def index():
     ultimo_dado = historico_leituras[-1] if historico_leituras else None
     return render_template('index.html', ultimo_dado=ultimo_dado, leituras=historico_leituras)
 
-"""@app.route('/dados_graficos')
-def dados_graficos():
-    sensores = SensorData.query.order_by(SensorData.data_hora.desc()).limit(50).all()
-    sensores.reverse()  # Para colocar em ordem ascendente
-
-    chart_data = {
-        'datas': [
-            (datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S') if isinstance(sensor.data_hora, str) else sensor.data_hora).strftime('%Y-%m-%d %H:%M:%S')
-            for sensor in sensores
-        ],
-        'umidades': [sensor.umidade for sensor in sensores],
-        'vibracoes': [sensor.vibracao for sensor in sensores],
-        'deslocamentoX': [sensor.deslocamento_x for sensor in sensores],
-        'deslocamentoY': [sensor.deslocamento_y for sensor in sensores],
-        'deslocamentoZ': [sensor.deslocamento_z for sensor in sensores]
-    }
-    return jsonify(chart_data)"""
-
+# Rota para dados dos gráficos
 @app.route('/dados_graficos')
+@login_required
 def dados_graficos():
     chart_data = {
         'datas': [leitura["data_hora"].strftime('%Y-%m-%d %H:%M:%S') for leitura in historico_leituras],
@@ -286,6 +254,27 @@ def dados_graficos():
     }
     return jsonify(chart_data)
 
+# Função para atualizar data_hora (opcional se não for necessário)
+def atualizar_data_hora():
+    print("Iniciando atualização de data_hora")
+    with app.app_context():
+        sensores = SensorData.query.all()
+        for sensor in sensores:
+            if isinstance(sensor.data_hora, str):
+                try:
+                    # Tente converter a string em datetime
+                    sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S')
+                    db.session.add(sensor)
+                except ValueError:
+                    try:
+                        sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S.%f')
+                        db.session.add(sensor)
+                    except ValueError:
+                        print(f"Formato de data inválido para o registro ID {sensor.id}: {sensor.data_hora}")
+                        continue
+        db.session.commit()
+        print("Atualização de data_hora concluída.")
+
 # Rota raiz redireciona para login ou index com base na sessão
 @app.route('/')
 def home():
@@ -295,10 +284,15 @@ def home():
         return redirect(url_for('login'))
 
 if __name__ == "__main__":
-    # Inicializar o banco de dados
+    # Inicializar o banco de dados e aplicar migrações
     with app.app_context():
-        db.create_all()
-
+        try:
+            upgrade()
+            atualizar_data_hora()
+            print("Migrações aplicadas com sucesso.")
+        except Exception as e:
+            print(f"Erro ao aplicar migrações: {e}")
+    
     # Configurar o cliente MQTT
     mqtt_client = mqtt.Client("PostgreSQL_Subscriber")
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
@@ -312,10 +306,10 @@ if __name__ == "__main__":
         mqtt_client.loop_start()
     except Exception as e:
         print(f"Erro ao conectar ao broker MQTT: {e}")
-
+    
     # Obter a porta do ambiente ou usar 5000 como padrão
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
-
-
-
+    try:
+        app.run(host='0.0.0.0', port=port)
+    except Exception as e:
+        print(f"Erro ao iniciar o servidor Flask: {e}")
