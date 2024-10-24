@@ -193,7 +193,7 @@ def login():
     if request.method == "POST":
         email = request.form.get("email")
         senha = request.form.get("password")
-        if not email ou não senha:
+        if not email or not senha:
             return render_template("login.html", error="Preencha todos os campos.")
         usuario = usuario_existe(email)
         if usuario:
