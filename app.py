@@ -40,6 +40,8 @@ migrate = Migrate(app, db)  # Inicializar o Flask-Migrate
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+historico_leituras = []
+
 # Modelos de banco de dados usando SQLAlchemy
 
 class SensorData(db.Model):
@@ -59,25 +61,14 @@ class Usuario(db.Model):
     email = db.Column(db.String(100), nullable=False, unique=True)
     senha = db.Column(db.String(256), nullable=False)
 
-def atualizar_data_hora():
-    print("Iniciando atualização de data_hora")
-    with app.app_context():
-        sensores = SensorData.query.all()
-        for sensor in sensores:
-            if isinstance(sensor.data_hora, str):
-                try:
-                    # Tente converter a string em datetime
-                    sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S')
-                    db.session.add(sensor)
-                except ValueError:
-                    try:
-                        sensor.data_hora = datetime.strptime(sensor.data_hora, '%Y-%m-%d %H:%M:%S.%f')
-                        db.session.add(sensor)
-                    except ValueError:
-                        print(f"Formato de data inválido para o registro ID {sensor.id}: {sensor.data_hora}")
-                        continue
-        db.session.commit()
-        print("Atualização de data_hora concluída.")
+# Decorador para exigir login
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario' not in session:
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Função para verificar se o usuário existe no banco de dados
 def usuario_existe(email):
@@ -98,7 +89,7 @@ def on_connect(client, userdata, flags, rc):
     else:
         print(f"Falha na conexão com o broker MQTT. Código: {rc}")
 
-# Função callback quando uma mensagem MQTT é recebida
+"""# Função callback quando uma mensagem MQTT é recebida
 def on_message(client, userdata, msg):
     try:
         # Decodificar a mensagem recebida
@@ -137,30 +128,61 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"Erro ao processar a mensagem: {e}")
         import traceback
-        traceback.print_exc()
+        traceback.print_exc()"""
 
-# Função para buscar dados de sensores do banco de dados
-def buscar_dados_sensores():
-    return SensorData.query.order_by(SensorData.data_hora.asc()).all()
-
-# Função para buscar o último dado
-def buscar_ultimo_dado():
-    return SensorData.query.order_by(SensorData.data_hora.desc()).first()
-
-# Função auxiliar para formatar data_hora
-def formatar_data_hora(data_hora):
-    if data_hora is None:
-        return 'Data indisponível'
-    elif isinstance(data_hora, str):
-        try:
-            data_hora = datetime.strptime(data_hora, '%Y-%m-%d %H:%M:%S')
-        except ValueError:
+# Função callback quando uma mensagem MQTT é recebida
+def on_message(client, userdata, message):
+    try:
+        payload = message.payload.decode('utf-8')
+        dados = json.loads(payload)
+        
+        # Converter a string data_hora em objeto datetime
+        data_hora_str = dados.get("data_hora", None)
+        if data_hora_str:
             try:
-                data_hora = datetime.strptime(data_hora, '%Y-%m-%d %H:%M:%S.%f')
+                data_hora = datetime.strptime(data_hora_str, '%Y-%m-%d %H:%M:%S')
             except ValueError:
-                print(f"Formato de data inválido: {data_hora}")
-                return 'Formato de data inválido'
-    return data_hora.strftime('%Y-%m-%d %H:%M:%S')
+                try:
+                    data_hora = datetime.strptime(data_hora_str, '%Y-%m-%d %H:%M:%S.%f')
+                except ValueError:
+                    print(f"Formato de data inválido na mensagem MQTT: {data_hora_str}")
+                    data_hora = datetime.utcnow()
+        else:
+            data_hora = datetime.utcnow()
+        
+        # Criar um objeto SensorData
+        leitura = SensorData(
+            data_hora=data_hora,
+            umidade=float(dados["umidade"]),
+            vibracao=float(dados["vibracao"]),
+            deslocamento_x=float(dados["deslocamento_x"]),
+            deslocamento_y=float(dados["deslocamento_y"]),
+            deslocamento_z=float(dados["deslocamento_z"])
+        )
+        
+        # Adicionar ao histórico de leituras
+        historico_leituras.append({
+            "data_hora": leitura.data_hora,
+            "umidade": leitura.umidade,
+            "vibracao": leitura.vibracao,
+            "deslocamento_x": leitura.deslocamento_x,
+            "deslocamento_y": leitura.deslocamento_y,
+            "deslocamento_z": leitura.deslocamento_z
+        })
+        
+        # Limitar o histórico a 50 leituras
+        if len(historico_leituras) > 50:
+            historico_leituras.pop(0)
+        
+        # Salvar no banco de dados
+        db.session.add(leitura)
+        db.session.commit()
+        
+        print("Leitura adicionada ao histórico e salva no banco de dados.")
+    except Exception as e:
+        print(f"Erro ao processar a mensagem: {e}")
+        import traceback
+        traceback.print_exc()
 
 # Rota para login
 @app.route("/login", methods=["GET", "POST"])
@@ -202,43 +224,14 @@ def cadastro():
         return redirect(url_for("login"))
     return render_template("cadastro.html")
 
-# Rota para receber dados dos sensores
-@app.route("/sensores", methods=["POST"])
-def recebe_data():
-    umidade = request.form.get('umidade')
-    vibracao = request.form.get('vibracao')
-    deslocamento_x = request.form.get('deslocamento_x')
-    deslocamento_y = request.form.get('deslocamento_y')
-    deslocamento_z = request.form.get('deslocamento_z')
-    if umidade and vibracao and deslocamento_x and deslocamento_y and deslocamento_z:
-        try:
-            umidade = float(umidade)
-            vibracao = float(vibracao)
-            deslocamento_x = float(deslocamento_x)
-            deslocamento_y = float(deslocamento_y)
-            deslocamento_z = float(deslocamento_z)
-            data_hora = datetime.now()
-            novo_sensor = SensorData(
-                data_hora=data_hora,
-                umidade=umidade,
-                vibracao=vibracao,
-                deslocamento_x=deslocamento_x,
-                deslocamento_y=deslocamento_y,
-                deslocamento_z=deslocamento_z
-            )
-            
-            db.session.add(novo_sensor)
-            db.session.commit()
-            return 'Dados obtidos e armazenados com sucesso', 200
-        except ValueError as e:
-            return f'Erro na conversão dos dados: {e}', 400
-        except Exception as e:
-            return f'Erro ao inserir dados: {e}', 500
-    else:
-        return 'Parâmetro(s) ausente(s)', 400
+# Rota para logout
+@app.route("/logout")
+def logout():
+    session.pop("usuario", None)
+    return redirect(url_for("login"))
 
 # Rota para página principal
-@app.route('/')
+"""@app.route('/')
 def index():
     ultimo_dado = buscar_ultimo_dado()
     sensores = SensorData.query.order_by(SensorData.data_hora.desc()).limit(50).all()
@@ -256,9 +249,14 @@ def index():
         'deslocamentoZ': [sensor.deslocamento_z for sensor in sensores]
     }
     
-    return render_template('index.html', ultimo_dado=ultimo_dado, chart_data=chart_data)
+    return render_template('index.html', ultimo_dado=ultimo_dado, chart_data=chart_data)"""
 
-@app.route('/dados_graficos')
+@app.route('/')
+def index():
+    ultimo_dado = historico_leituras[-1] if historico_leituras else None
+    return render_template('index.html', ultimo_dado=ultimo_dado, leituras=historico_leituras)
+
+"""@app.route('/dados_graficos')
 def dados_graficos():
     sensores = SensorData.query.order_by(SensorData.data_hora.desc()).limit(50).all()
     sensores.reverse()  # Para colocar em ordem ascendente
@@ -274,19 +272,32 @@ def dados_graficos():
         'deslocamentoY': [sensor.deslocamento_y for sensor in sensores],
         'deslocamentoZ': [sensor.deslocamento_z for sensor in sensores]
     }
+    return jsonify(chart_data)"""
+
+@app.route('/dados_graficos')
+def dados_graficos():
+    chart_data = {
+        'datas': [leitura["data_hora"].strftime('%Y-%m-%d %H:%M:%S') for leitura in historico_leituras],
+        'umidades': [leitura["umidade"] for leitura in historico_leituras],
+        'vibracoes': [leitura["vibracao"] for leitura in historico_leituras],
+        'deslocamentoX': [leitura["deslocamento_x"] for leitura in historico_leituras],
+        'deslocamentoY': [leitura["deslocamento_y"] for leitura in historico_leituras],
+        'deslocamentoZ': [leitura["deslocamento_z"] for leitura in historico_leituras]
+    }
     return jsonify(chart_data)
 
-# Rota para logout
-@app.route("/logout")
-def logout():
-    session.pop("usuario", None)
-    return redirect(url_for("login"))
+# Rota raiz redireciona para login ou index com base na sessão
+@app.route('/')
+def home():
+    if 'usuario' in session:
+        return redirect(url_for('index'))
+    else:
+        return redirect(url_for('login'))
 
 if __name__ == "__main__":
     # Inicializar o banco de dados
     with app.app_context():
         db.create_all()
-        atualizar_data_hora()
 
     # Configurar o cliente MQTT
     mqtt_client = mqtt.Client("PostgreSQL_Subscriber")
@@ -296,8 +307,11 @@ if __name__ == "__main__":
     mqtt_client.on_message = on_message
 
     # Conectar ao broker MQTT e iniciar o loop
-    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
-    mqtt_client.loop_start()
+    try:
+        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        mqtt_client.loop_start()
+    except Exception as e:
+        print(f"Erro ao conectar ao broker MQTT: {e}")
 
     # Obter a porta do ambiente ou usar 5000 como padrão
     port = int(os.environ.get('PORT', 5000))
