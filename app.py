@@ -36,9 +36,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)  # Inicializar o Flask-Migrate
 
-# Dicionário para armazenar as últimas 50 leituras
-historico_leituras = []
-
 # Função para hash de senha
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -101,8 +98,6 @@ def on_connect(client, userdata, flags, rc):
     else:
         print(f"Falha na conexão com o broker MQTT. Código: {rc}")
 
-
-"""
 # Função callback quando uma mensagem MQTT é recebida
 def on_message(client, userdata, msg):
     try:
@@ -143,47 +138,6 @@ def on_message(client, userdata, msg):
         print(f"Erro ao processar a mensagem: {e}")
         import traceback
         traceback.print_exc()
-"""
-
-# Função callback quando uma mensagem MQTT é recebida
-def on_message(client, userdata, msg):
-    try:
-        payload = json.loads(msg.payload)
-        print(f"Mensagem recebida: {payload}")
-
-        data_hora = datetime.strptime(payload["data_hora"], '%Y-%m-%d %H:%M:%S')
-
-        sensor_data = SensorData(
-            data_hora=data_hora,
-            umidade=float(payload["umidade"]),
-            vibracao=float(payload["vibracao"]),
-            deslocamento_x=float(payload["deslocamento_x"]),
-            deslocamento_y=float(payload["deslocamento_y"]),
-            deslocamento_z=float(payload["deslocamento_z"])
-        )
-
-        db.session.add(sensor_data)
-        db.session.commit()
-
-        # Adicionar leitura ao histórico e manter apenas as últimas 50
-        if len(historico_leituras) >= 50:
-            historico_leituras.pop(0)  # Remove a leitura mais antiga
-
-        historico_leituras.append({
-            "data_hora": data_hora,
-            "umidade": payload["umidade"],
-            "vibracao": payload["vibracao"],
-            "deslocamento_x": payload["deslocamento_x"],
-            "deslocamento_y": payload["deslocamento_y"],
-            "deslocamento_z": payload["deslocamento_z"]
-        })
-
-        print("Leitura adicionada ao histórico e salva no banco de dados.")
-
-    except Exception as e:
-        print(f"Erro ao processar a mensagem: {e}")
-        import traceback
-        traceback.print_exc()
 
 # Função para buscar dados de sensores do banco de dados
 def buscar_dados_sensores():
@@ -192,6 +146,21 @@ def buscar_dados_sensores():
 # Função para buscar o último dado
 def buscar_ultimo_dado():
     return SensorData.query.order_by(SensorData.data_hora.desc()).first()
+
+# Função auxiliar para formatar data_hora
+def formatar_data_hora(data_hora):
+    if data_hora is None:
+        return 'Data indisponível'
+    elif isinstance(data_hora, str):
+        try:
+            data_hora = datetime.strptime(data_hora, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            try:
+                data_hora = datetime.strptime(data_hora, '%Y-%m-%d %H:%M:%S.%f')
+            except ValueError:
+                print(f"Formato de data inválido: {data_hora}")
+                return 'Formato de data inválido'
+    return data_hora.strftime('%Y-%m-%d %H:%M:%S')
 
 # Rota para login
 @app.route("/login", methods=["GET", "POST"])
@@ -267,21 +236,6 @@ def recebe_data():
             return f'Erro ao inserir dados: {e}', 500
     else:
         return 'Parâmetro(s) ausente(s)', 400
-    
-# Função auxiliar para formatar data_hora
-def formatar_data_hora(data_hora):
-    if data_hora is None:
-        return 'Data indisponível'
-    elif isinstance(data_hora, str):
-        try:
-            data_hora = datetime.strptime(data_hora, '%Y-%m-%d %H:%M:%S')
-        except ValueError:
-            try:
-                data_hora = datetime.strptime(data_hora, '%Y-%m-%d %H:%M:%S.%f')
-            except ValueError:
-                print(f"Formato de data inválido: {data_hora}")
-                return 'Formato de data inválido'
-    return data_hora.strftime('%Y-%m-%d %H:%M:%S')
 
 # Rota para página principal
 @app.route('/')
@@ -304,7 +258,6 @@ def index():
     
     return render_template('index.html', ultimo_dado=ultimo_dado, chart_data=chart_data)
 
-"""
 @app.route('/dados_graficos')
 def dados_graficos():
     sensores = SensorData.query.order_by(SensorData.data_hora.desc()).limit(50).all()
@@ -320,20 +273,6 @@ def dados_graficos():
         'deslocamentoX': [sensor.deslocamento_x for sensor in sensores],
         'deslocamentoY': [sensor.deslocamento_y for sensor in sensores],
         'deslocamentoZ': [sensor.deslocamento_z for sensor in sensores]
-    }
-    return jsonify(chart_data)
-"""
-
-# Rota para fornecer dados para o gráfico via JSON
-@app.route('/dados_graficos')
-def dados_graficos():
-    chart_data = {
-        'datas': [leitura["data_hora"].strftime('%Y-%m-%d %H:%M:%S') for leitura in historico_leituras],
-        'umidades': [leitura["umidade"] for leitura in historico_leituras],
-        'vibracoes': [leitura["vibracao"] for leitura in historico_leituras],
-        'deslocamentoX': [leitura["deslocamento_x"] for leitura in historico_leituras],
-        'deslocamentoY': [leitura["deslocamento_y"] for leitura in historico_leituras],
-        'deslocamentoZ': [leitura["deslocamento_z"] for leitura in historico_leituras]
     }
     return jsonify(chart_data)
 
